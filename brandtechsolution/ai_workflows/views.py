@@ -502,10 +502,10 @@ def codex_poll_device_auth(request):
 @require_http_methods(["POST"])
 def refresh_provider_catalogue(request):
     """Trigger a refresh of the model catalogue across providers."""
-    from ai_workflows.harness.catalogue import refresh_all
+    from ai_workflows.harness.catalogue import refresh
 
     try:
-        summary = refresh_all()
+        summary = refresh()
         return JsonResponse({"success": True, "summary": summary})
     except Exception as e:
         logger.exception("[catalogue] Refresh failed: %s", e)

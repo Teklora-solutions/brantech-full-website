@@ -377,6 +377,12 @@
                 method: 'POST',
                 headers: { 'X-CSRFToken': getCsrfToken() }
             });
+            if (!res.ok) {
+                const text = await res.text();
+                let errMsg = 'Refresh failed';
+                try { errMsg = JSON.parse(text).error || errMsg; } catch(e) { console.error("Non-JSON response"); }
+                throw new Error(errMsg);
+            }
             const data = await res.json();
             if (data.success) {
                 if (window.showToast) window.showToast('Model catalogue refreshed', 'success');

@@ -317,10 +317,13 @@ class VertexAIAdapter(ProviderAdapter):
         if not self.has_credential():
             return []
         return [
+            ModelInfo(model_id="gemini-3.8-flash", display_name="Gemini 3.8 Flash (Vertex AI)", context_tokens=1048576, max_output_tokens=8192),
+            ModelInfo(model_id="gemini-3.8-live", display_name="Gemini 3.8 Live (Vertex AI)", context_tokens=1048576, max_output_tokens=8192),
+            ModelInfo(model_id="gemini-3.8-live-extended-thinking", display_name="Gemini 3.8 Live Extended Thinking (Vertex AI)", context_tokens=1048576, max_output_tokens=8192),
+            ModelInfo(model_id="gemini-3.6-flash", display_name="Gemini 3.6 Flash (Vertex AI)", context_tokens=1048576, max_output_tokens=8192),
+            ModelInfo(model_id="gemini-3.1-pro-preview", display_name="Gemini 3.1 Pro Preview (Vertex AI)", context_tokens=1048576, max_output_tokens=8192),
+            ModelInfo(model_id="gemini-2.5-pro", display_name="Gemini 2.5 Pro (Vertex AI)", context_tokens=1048576, max_output_tokens=8192),
             ModelInfo(model_id="gemini-2.5-flash", display_name="Gemini 2.5 Flash (Vertex AI)", context_tokens=1048576, max_output_tokens=8192),
-            ModelInfo(model_id="gemini-1.5-pro", display_name="Gemini 1.5 Pro (Vertex AI)", context_tokens=2097152, max_output_tokens=8192),
-            ModelInfo(model_id="gemini-1.5-flash", display_name="Gemini 1.5 Flash (Vertex AI)", context_tokens=1048576, max_output_tokens=8192),
-            ModelInfo(model_id="gemini-2.5-pro", display_name="Gemini 2.5 Pro (Vertex AI)", context_tokens=2097152, max_output_tokens=8192),
         ]
 
 
