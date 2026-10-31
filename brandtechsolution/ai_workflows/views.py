@@ -4,6 +4,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib.admin.views.decorators import staff_member_required
 from django.conf import settings
+from brandtechsolution.config import config
 from brandtechsolution.ratelimit import rate_limited
 from .service import get_chatbot_response, ChatAssistant
 from .models import ConversationThread, ConversationCheckpoint
