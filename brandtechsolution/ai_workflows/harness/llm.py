@@ -121,6 +121,7 @@ def _vertex(role, tools, model, **overrides):
     cred_path = _require_credential(Provider.VERTEX, model)
     credentials = None
     project_id = getattr(config, "vertex_project_id", "")
+    location = getattr(config, "vertex_location", "global")
 
     if cred_path and os.path.exists(cred_path):
         credentials = service_account.Credentials.from_service_account_file(cred_path)
@@ -135,6 +136,9 @@ def _vertex(role, tools, model, **overrides):
     kwargs = {
         "model": model,
         "credentials": credentials,
+        "vertexai": True,
+        "project": project_id or None,
+        "location": location,
         "temperature": ROLE_TEMPERATURE[role],
         "timeout": getattr(config, "llm_timeout", REQUEST_TIMEOUT),
         "max_retries": MAX_RETRIES,

@@ -218,7 +218,7 @@ class AppSettings(BaseSettings):
     # Google Cloud Vertex AI Configuration (Service Account JSON & Project)
     google_application_credentials: str = ""
     vertex_project_id: str = ""
-    vertex_location: str = "us-central1"
+    vertex_location: str = "global"
 
     # Per-request ceiling for a chat model call, in seconds.
     llm_timeout: int = 60

@@ -48,6 +48,8 @@ services:
       - ./data/media:/app/brandtechsolution/media
       # Mail attachments: private, never under media.
       - ./data/private:/app/brandtechsolution/private
+      # Service account credentials for Vertex AI / GCP
+      - ./credentials:/app/brandtechsolution/credentials:ro
     depends_on:
       db:
         condition: service_healthy
@@ -68,6 +70,8 @@ services:
     volumes:
       # Same media mount as web: the visual agent writes generated assets.
       - ./data/media:/app/brandtechsolution/media
+      # Service account credentials for Vertex AI / GCP
+      - ./credentials:/app/brandtechsolution/credentials:ro
     command: ["worker"]
     healthcheck:
       test: ["CMD-SHELL", "celery -A brandtechsolution inspect ping -d celery@$$HOSTNAME"]

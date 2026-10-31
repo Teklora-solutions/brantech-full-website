@@ -72,6 +72,13 @@ db.sqlite3-journal
 *.env
 cloudflared.env
 
+# Cloud & Service Account Credentials
+credentials/
+*.json
+!package.json
+!tsconfig.json
+
+
 # ChromaDB / Vector Stores
 chroma_db/
 *.sqlite3
