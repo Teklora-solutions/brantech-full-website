@@ -16,12 +16,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import requests
+import urllib3.util.connection as urllib3_conn
+
+# Force IPv4 socket resolution to avoid IPv6 connection timeouts on dual-stack hosts
+urllib3_conn.HAS_IPV6 = False
 
 from brandtechsolution.config import config
 
 logger = logging.getLogger(__name__)
 
-LIST_TIMEOUT = 15
+LIST_TIMEOUT = 10
 
 
 @dataclass

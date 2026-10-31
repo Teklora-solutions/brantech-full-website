@@ -311,14 +311,8 @@ def ai_config_summary(request):
         if not default_model and name == "gemini":
             default_model = getattr(config, "gemini_chat_model", "gemini-2.5-flash")
 
-        # Models count
+        # Models count from database
         model_count = CatalogueEntry.objects.filter(provider=name, available=True).count()
-        if model_count == 0:
-            # Fall back to adapter's statically declared models if not refreshed yet
-            try:
-                model_count = len(adapter.list_models())
-            except Exception:
-                model_count = 0
 
         providers_data.append({
             "name": name,
@@ -350,7 +344,7 @@ def ai_config_summary(request):
             "is_active": tp.is_active,
         })
 
-    # 4. Available models catalogue mapped by provider
+    # 4. Available models catalogue mapped by provider (read directly from cached DB)
     models_by_provider = {}
     for entry in CatalogueEntry.objects.filter(available=True).order_by("provider", "model_id"):
         models_by_provider.setdefault(entry.provider, []).append({
@@ -360,21 +354,6 @@ def ai_config_summary(request):
             "input_price": float(entry.input_price_per_mtok) if entry.input_price_per_mtok is not None else None,
             "output_price": float(entry.output_price_per_mtok) if entry.output_price_per_mtok is not None else None,
         })
-
-    # If any adapter has models not yet in CatalogueEntry, add them
-    for name, adapter in ADAPTERS.items():
-        if name not in models_by_provider or not models_by_provider[name]:
-            try:
-                for m in adapter.list_models():
-                    models_by_provider.setdefault(name, []).append({
-                        "model_id": m.model_id,
-                        "display_name": m.display_name or m.model_id,
-                        "context_tokens": m.context_tokens,
-                        "input_price": m.input_price_per_mtok,
-                        "output_price": m.output_price_per_mtok,
-                    })
-            except Exception:
-                pass
 
     codex_status = CodexDeviceAuthService.get_status()
 
