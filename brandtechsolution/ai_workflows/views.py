@@ -486,7 +486,21 @@ def refresh_provider_catalogue(request):
 
     try:
         summary = refresh()
-        return JsonResponse({"success": True, "summary": summary})
+        # Serialize Provider model instances in summary to dicts
+        providers_summary = {}
+        for prov_name, p_instance in summary.get("providers", {}).items():
+            providers_summary[prov_name] = {
+                "status": p_instance.status,
+                "enabled": p_instance.enabled,
+                "preference": p_instance.preference,
+                "last_error": p_instance.last_error,
+            }
+        serialized_summary = {
+            "providers": providers_summary,
+            "borrowed": summary.get("borrowed", 0),
+            "manual": summary.get("manual", 0),
+        }
+        return JsonResponse({"success": True, "summary": serialized_summary})
     except Exception as e:
         logger.exception("[catalogue] Refresh failed: %s", e)
         return JsonResponse({"error": str(e)}, status=500)
