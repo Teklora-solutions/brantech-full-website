@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **AI Configuration & Touchpoints Hub (`/admin-panel/?section=ai`)**: Centralized LLM governance studio providing live provider connection status badges, per-token pricing indices, dynamic model catalogue browser, and touchpoint routing controls.
+- **Dynamic Touchpoints Registry Pattern (`ai_workflows/harness/touchpoints.py`)**: Automatic registration pattern (`@register_touchpoint`) mapping any LLM invocation point in Django across agents/tasks to `AITouchpoint` database models, allowing operators to pin dedicated Providers and Models with custom fallback and temperature overrides.
+- **Codex / ChatGPT Device Code Authentication**: Interactive device authorization flow invoking `https://auth.openai.com/codex/device` with one-time verification codes and background polling for seamless ChatGPT Plus/Pro subscription connections.
+- **Google Cloud Vertex AI Adapter**: Added `VertexAIAdapter` supporting Google Cloud Service Account `.json` keys via `GOOGLE_APPLICATION_CREDENTIALS`, project IDs, and locations.
 - **Unified Projects & GitHub Source Hub**: Unified repository management into the canonical Projects admin section (`/admin-panel/?section=projects`), replacing the fragmented standalone GitHub Manager view.
 - **Dynamic Palette Extraction & Theme Harmonization**: Automatic sampling and derivation of vibrant brand accents and deep glow shades from uploaded project covers and screenshots, propagating dynamically across card glowing borders, showcase modules, and charts.
 - **Media Attachments (Screenshots & Video)**: Extended `Project` model with direct video demonstration support (`video_url`, `video_file`) and enriched interface gallery management.

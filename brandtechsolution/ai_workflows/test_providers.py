@@ -64,7 +64,7 @@ class AdapterShapeTests(TestCase):
     """Each adapter knows its own endpoint and response shape."""
 
     def test_every_adapter_is_addressable_by_name(self):
-        for name in ("gemini", "openrouter", "anthropic", "openai", "deepseek", "codex"):
+        for name in ("gemini", "vertex", "openrouter", "anthropic", "openai", "deepseek", "codex"):
             self.assertIs(get_adapter(name), ADAPTERS[name])
 
     def test_an_unknown_provider_lists_the_known_ones(self):

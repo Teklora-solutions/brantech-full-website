@@ -13,6 +13,7 @@ metadata source for everyone, with the ceiling recorded on every row it feeds
 """
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 
 import requests
 
@@ -33,7 +34,7 @@ class ModelInfo:
     max_output_tokens: int | None = None
     input_price_per_mtok: float | None = None
     output_price_per_mtok: float | None = None
-    capabilities: dict = None
+    capabilities: dict | None = None
     deprecated_at: str | None = None
 
     def __post_init__(self):
@@ -256,18 +257,77 @@ class CodexAdapter(ProviderAdapter):
     default_enabled = False
 
     def credential(self):
-        return (getattr(config, "codex_oauth_token", "") or "").strip()
+        # 1. Configured token from environment
+        token = (getattr(config, "codex_oauth_token", "") or "").strip()
+        if token:
+            return token
+
+        # 2. Local fallback: ~/.codex/auth.json if present
+        local_auth = Path.home() / ".codex" / "auth.json"
+        if local_auth.exists():
+            try:
+                import json
+                with local_auth.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    tok = data.get("tokens", {}).get("access_token", "")
+                    if tok:
+                        return tok.strip()
+            except Exception:
+                pass
+        return ""
+
+    def has_credential(self):
+        return bool(self.credential())
 
     def list_models(self):
-        # No public listing; what it can serve is whatever the subscription
-        # grants. Enabling it means naming models in the catalogue by hand.
-        return []
+        # Known models accessible via ChatGPT Plus/Pro subscription
+        return [
+            ModelInfo(model_id="gpt-4o", display_name="GPT-4o (Codex Subscription)", context_tokens=128000),
+            ModelInfo(model_id="gpt-4o-mini", display_name="GPT-4o Mini (Codex Subscription)", context_tokens=128000),
+            ModelInfo(model_id="o1-preview", display_name="o1 Preview (Codex Subscription)", context_tokens=128000),
+            ModelInfo(model_id="o3-mini", display_name="o3 Mini (Codex Subscription)", context_tokens=200000),
+        ]
+
+
+class VertexAIAdapter(ProviderAdapter):
+    """Google Cloud Vertex AI using Service Account JSON Credentials.
+
+    Reads `GOOGLE_APPLICATION_CREDENTIALS` (path to service account JSON),
+    `VERTEX_PROJECT_ID`, and `VERTEX_LOCATION`.
+    """
+
+    name = "vertex"
+    billing = "usage"
+    preference = 15
+
+    def credential(self):
+        cred_path = (getattr(config, "google_application_credentials", "") or "").strip()
+        if not cred_path:
+            import os
+            cred_path = (os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "") or "").strip()
+        return cred_path
+
+    def has_credential(self):
+        path = self.credential()
+        if not path:
+            return False
+        return Path(path).exists()
+
+    def list_models(self):
+        if not self.has_credential():
+            return []
+        return [
+            ModelInfo(model_id="gemini-2.5-flash", display_name="Gemini 2.5 Flash (Vertex AI)", context_tokens=1048576, max_output_tokens=8192),
+            ModelInfo(model_id="gemini-1.5-pro", display_name="Gemini 1.5 Pro (Vertex AI)", context_tokens=2097152, max_output_tokens=8192),
+            ModelInfo(model_id="gemini-1.5-flash", display_name="Gemini 1.5 Flash (Vertex AI)", context_tokens=1048576, max_output_tokens=8192),
+            ModelInfo(model_id="gemini-2.5-pro", display_name="Gemini 2.5 Pro (Vertex AI)", context_tokens=2097152, max_output_tokens=8192),
+        ]
 
 
 ADAPTERS = {
     adapter.name: adapter()
     for adapter in (
-        GeminiAdapter, OpenRouterAdapter, AnthropicAdapter,
+        GeminiAdapter, VertexAIAdapter, OpenRouterAdapter, AnthropicAdapter,
         OpenAIAdapter, DeepSeekAdapter, CodexAdapter,
     )
 }

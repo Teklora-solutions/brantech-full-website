@@ -1,0 +1,206 @@
+{% load static %}
+<!-- AI Configuration & Touchpoint Governance Hub -->
+<div id="section-ai" class="admin-section hidden p-6 space-y-8 max-w-7xl mx-auto">
+    <!-- Header Banner -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-purple-900/30 via-surface to-surface border border-purple-500/20 rounded-2xl p-6 backdrop-blur-md">
+        <div>
+            <div class="flex items-center gap-3 mb-1">
+                <span class="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    <i class="fas fa-brain-circuit text-lg"></i>
+                </span>
+                <h1 class="text-2xl font-bold font-heading text-primaryText">AI Configuration & Touchpoint Hub</h1>
+            </div>
+            <p class="text-sm text-secondaryText">
+                Manage LLM provider credentials, connect your ChatGPT / Codex subscription via device code, and route models per touchpoint.
+            </p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button id="refreshCatalogueBtn" type="button" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-borderLight text-primaryText hover:border-purple-400/40 hover:bg-white/5 transition-all text-sm font-medium shadow-sm">
+                <i class="fas fa-arrows-rotate text-purple-400"></i>
+                <span>Refresh Catalogue</span>
+            </button>
+            <button id="openCodexModalBtn" type="button" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:opacity-95 transition-all text-sm font-semibold shadow-lg shadow-emerald-900/30">
+                <i class="fas fa-plug-circle-bolt"></i>
+                <span>Connect Codex Subscription</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Providers Grid -->
+    <div>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold font-heading text-primaryText flex items-center gap-2">
+                <i class="fas fa-server text-brandBlue"></i>
+                <span>Model Providers Status</span>
+            </h2>
+            <span class="text-xs text-secondaryText">Credentials loaded via <code class="text-sky-400 bg-white/5 px-1.5 py-0.5 rounded">.env</code> &amp; OAuth</span>
+        </div>
+        <div id="aiProvidersGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <!-- Dynamically populated provider cards -->
+            <div class="p-6 rounded-2xl bg-surface border border-borderLight animate-pulse flex items-center justify-center min-h-[160px]">
+                <span class="text-sm text-secondaryText">Loading provider statuses...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Touchpoints Governance Table -->
+    <div class="clean-card rounded-2xl border border-borderLight bg-surface overflow-hidden shadow-sm">
+        <div class="p-6 border-b border-borderLight flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold font-heading text-primaryText flex items-center gap-2">
+                    <i class="fas fa-network-wired text-purple-400"></i>
+                    <span>System Touchpoints Registry</span>
+                </h2>
+                <p class="text-xs text-secondaryText mt-1">
+                    Every point in Teklora that invokes an LLM. Pick a dedicated Provider + Model or leave on auto-resolution.
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-secondaryText"></i>
+                    <input id="touchpointSearchInput" type="text" placeholder="Filter touchpoints..." class="pl-8 pr-3 py-1.5 rounded-lg bg-background border border-borderLight text-xs text-primaryText placeholder-secondaryText focus:outline-none focus:border-purple-400 w-48 md:w-64 transition-all">
+                </div>
+            </div>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-white/[0.02] border-b border-borderLight text-xs font-semibold text-secondaryText uppercase tracking-wider">
+                        <th class="py-3.5 px-6">Touchpoint / Agent</th>
+                        <th class="py-3.5 px-6">Default Role</th>
+                        <th class="py-3.5 px-6">Provider Override</th>
+                        <th class="py-3.5 px-6">Model Assigned</th>
+                        <th class="py-3.5 px-6">Fallback</th>
+                        <th class="py-3.5 px-6 text-right">Invocations</th>
+                        <th class="py-3.5 px-6 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="touchpointsTableBody" class="divide-y divide-borderLight text-sm text-primaryText">
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-secondaryText">
+                            <i class="fas fa-circle-notch fa-spin mr-2"></i> Loading registered touchpoints...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Model Catalogue Explorer -->
+    <div class="clean-card rounded-2xl border border-borderLight bg-surface p-6 shadow-sm">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+                <h2 class="text-lg font-bold font-heading text-primaryText flex items-center gap-2">
+                    <i class="fas fa-book-bookmark text-amber-400"></i>
+                    <span>Model Catalogue &amp; Pricing Index</span>
+                </h2>
+                <p class="text-xs text-secondaryText mt-1">
+                    Live metadata, pricing per 1M tokens, and context ceilings across discovered provider models.
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <select id="catalogueProviderFilter" class="px-3 py-1.5 rounded-lg bg-background border border-borderLight text-xs text-primaryText focus:outline-none focus:border-purple-400">
+                    <option value="all">All Providers</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="vertex">Vertex AI</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="codex">Codex</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="catalogueCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[460px] overflow-y-auto pr-1">
+            <!-- Dynamically populated catalogue cards -->
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MODAL: Codex Device Code Authorization Flow -->
+<!-- ============================================================ -->
+<div id="codexAuthModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+    <div class="bg-surface border border-emerald-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <!-- Close Button -->
+        <button id="closeCodexModalBtn" type="button" class="absolute top-4 right-4 text-secondaryText hover:text-primaryText p-2 rounded-lg hover:bg-white/5 transition-colors">
+            <i class="fas fa-xmark text-lg"></i>
+        </button>
+
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold font-heading text-primaryText">Connect Codex Subscription</h3>
+                <p class="text-xs text-secondaryText">Authorize with your ChatGPT Plus / Pro account</p>
+            </div>
+        </div>
+
+        <div id="codexStepInit" class="space-y-4 py-2">
+            <p class="text-sm text-secondaryText">
+                This triggers the OpenAI Device Authorization flow. You will receive a one-time code to enter at <code class="text-emerald-400">auth.openai.com/codex/device</code> without exposing your private API keys.
+            </p>
+            <div class="p-4 rounded-xl bg-background border border-borderLight text-xs text-secondaryText space-y-1.5">
+                <div class="flex items-center gap-2 text-primaryText font-semibold">
+                    <i class="fas fa-shield-halved text-emerald-400"></i>
+                    <span>Subscription Integration</span>
+                </div>
+                <p>Consumes subscription allowances rather than per-token credits. Verified and maintained securely via session tokens.</p>
+            </div>
+            <button id="startCodexFlowBtn" type="button" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2 transition-all">
+                <i class="fas fa-key"></i>
+                <span>Generate One-Time Device Code</span>
+            </button>
+        </div>
+
+        <div id="codexStepActive" class="space-y-5 py-2 hidden">
+            <div class="text-center space-y-2">
+                <span class="text-xs uppercase font-semibold text-secondaryText tracking-wider">Your One-Time Device Code</span>
+                <div class="flex items-center justify-center gap-3">
+                    <span id="codexUserCodeDisplay" class="font-mono text-3xl font-black text-emerald-400 tracking-widest px-4 py-2 rounded-xl bg-background border border-emerald-500/40 select-all">
+                        ---- - ----
+                    </span>
+                    <button id="copyCodexCodeBtn" type="button" class="p-3 rounded-xl bg-surface border border-borderLight hover:border-emerald-400 text-primaryText transition-colors" title="Copy Code">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-xs text-secondaryText space-y-3">
+                <div class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">1</span>
+                    <p class="pt-0.5">Click the link below to open OpenAI verification in your browser:</p>
+                </div>
+                <div class="pl-7.5">
+                    <a id="codexVerifyLink" href="https://auth.openai.com/codex/device" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-emerald-400 hover:underline font-semibold text-sm">
+                        <span>https://auth.openai.com/codex/device</span>
+                        <i class="fas fa-arrow-up-right-from-square text-xs"></i>
+                    </a>
+                </div>
+                <div class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">2</span>
+                    <p class="pt-0.5">Sign in to ChatGPT and paste the code shown above.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-center gap-2.5 text-xs text-secondaryText py-1">
+                <i class="fas fa-circle-notch fa-spin text-emerald-400"></i>
+                <span id="codexPollStatusText">Waiting for your browser confirmation...</span>
+            </div>
+        </div>
+
+        <div id="codexStepSuccess" class="space-y-4 py-4 text-center hidden">
+            <div class="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-2xl flex items-center justify-center mx-auto">
+                <i class="fas fa-check"></i>
+            </div>
+            <h4 class="text-lg font-bold text-primaryText">Codex Successfully Connected!</h4>
+            <p id="codexAccountDetailText" class="text-xs text-secondaryText">ChatGPT Plus/Pro active. Models are now ready in the catalogue.</p>
+            <button id="finishCodexModalBtn" type="button" class="w-full py-2.5 rounded-xl bg-surface border border-borderLight hover:border-emerald-400 text-primaryText font-semibold text-sm transition-all">
+                Done
+            </button>
+        </div>
+    </div>
+</div>

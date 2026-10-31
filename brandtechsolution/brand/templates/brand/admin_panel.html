@@ -261,6 +261,9 @@
     <!-- Staff & Groups Section -->
     {% if can.manage_staff %}{% include 'brand/admin/_staff.html' %}{% endif %}
 
+    <!-- AI Configuration & Touchpoint Hub Section -->
+    {% if can.manage_staff %}{% include 'brand/admin/_ai_config.html' %}{% endif %}
+
 </div>
 {% endblock %}
 
@@ -277,6 +280,7 @@
 <script src="{% static 'brand/js/admin/recipients.js' %}?v=3.0.0" defer></script>
 <script src="{% static 'brand/js/admin/staff.js' %}?v=2.0.0" defer></script>
 <script src="{% static 'brand/js/admin/tasks.js' %}" defer></script>
+<script src="{% static 'brand/js/admin/ai_config.js' %}?v=1.0.0" defer></script>
 
 {{ capabilities|json_script:"capabilityData" }}
 <script>

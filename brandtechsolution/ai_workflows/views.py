@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.contrib.admin.views.decorators import staff_member_required
 from django.conf import settings
 from brandtechsolution.ratelimit import rate_limited
 from .service import get_chatbot_response, ChatAssistant
@@ -279,3 +280,234 @@ def clear_chat_history(request):
             del request.session['chat_messages']
         request.session.modified = True
         return JsonResponse({"success": True})
+
+
+# ============================================================
+# AI CONFIGURATION, TOUCHPOINTS & CODEX ADMIN ENDPOINTS
+# ============================================================
+
+
+@staff_member_required
+@require_http_methods(["GET"])
+def ai_config_summary(request):
+    """Return live status of all LLM providers, touchpoints, and model catalogue."""
+    from ai_workflows.models import Provider, CatalogueEntry, AITouchpoint
+    from ai_workflows.harness.providers import ADAPTERS
+    from ai_workflows.harness.touchpoints import sync_registered_touchpoints
+    from ai_workflows.harness.codex_auth import CodexDeviceAuthService
+
+    # 1. Sync in-memory touchpoints into DB
+    sync_registered_touchpoints()
+
+    # 2. Providers status
+    db_providers = {p.name: p for p in Provider.objects.all()}
+    providers_data = []
+
+    for name, adapter in sorted(ADAPTERS.items(), key=lambda x: x[1].preference):
+        db_p = db_providers.get(name)
+        has_cred = adapter.has_credential()
+        enabled = db_p.enabled if db_p else adapter.default_enabled
+        default_model = db_p.default_model if db_p else ""
+        if not default_model and name == "gemini":
+            default_model = getattr(config, "gemini_chat_model", "gemini-2.5-flash")
+
+        # Models count
+        model_count = CatalogueEntry.objects.filter(provider=name, available=True).count()
+        if model_count == 0:
+            # Fall back to adapter's statically declared models if not refreshed yet
+            try:
+                model_count = len(adapter.list_models())
+            except Exception:
+                model_count = 0
+
+        providers_data.append({
+            "name": name,
+            "billing": adapter.billing,
+            "preference": db_p.preference if db_p else adapter.preference,
+            "has_credential": has_cred,
+            "enabled": enabled,
+            "status": "active" if has_cred and enabled else ("candidate" if has_cred else "absent"),
+            "default_model": default_model,
+            "model_count": model_count,
+            "last_checked_at": db_p.last_checked_at.isoformat() if db_p and db_p.last_checked_at else None,
+            "last_error": db_p.last_error if db_p else "",
+        })
+
+    # 3. Touchpoints
+    touchpoints = []
+    for tp in AITouchpoint.objects.all():
+        touchpoints.append({
+            "key": tp.key,
+            "name": tp.name,
+            "description": tp.description,
+            "default_role": tp.default_role,
+            "pinned_provider": tp.pinned_provider,
+            "pinned_model": tp.pinned_model,
+            "allow_fallback": tp.allow_fallback,
+            "temperature_override": tp.temperature_override,
+            "total_invocations": tp.total_invocations,
+            "last_invoked_at": tp.last_invoked_at.isoformat() if tp.last_invoked_at else None,
+            "is_active": tp.is_active,
+        })
+
+    # 4. Available models catalogue mapped by provider
+    models_by_provider = {}
+    for entry in CatalogueEntry.objects.filter(available=True).order_by("provider", "model_id"):
+        models_by_provider.setdefault(entry.provider, []).append({
+            "model_id": entry.model_id,
+            "display_name": entry.display_name or entry.model_id,
+            "context_tokens": entry.context_tokens,
+            "input_price": float(entry.input_price_per_mtok) if entry.input_price_per_mtok is not None else None,
+            "output_price": float(entry.output_price_per_mtok) if entry.output_price_per_mtok is not None else None,
+        })
+
+    # If any adapter has models not yet in CatalogueEntry, add them
+    for name, adapter in ADAPTERS.items():
+        if name not in models_by_provider or not models_by_provider[name]:
+            try:
+                for m in adapter.list_models():
+                    models_by_provider.setdefault(name, []).append({
+                        "model_id": m.model_id,
+                        "display_name": m.display_name or m.model_id,
+                        "context_tokens": m.context_tokens,
+                        "input_price": m.input_price_per_mtok,
+                        "output_price": m.output_price_per_mtok,
+                    })
+            except Exception:
+                pass
+
+    codex_status = CodexDeviceAuthService.get_status()
+
+    return JsonResponse({
+        "success": True,
+        "providers": providers_data,
+        "touchpoints": touchpoints,
+        "models_by_provider": models_by_provider,
+        "codex": codex_status,
+    })
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def update_touchpoint_config(request, key):
+    """Update administrative LLM routing for a specific touchpoint."""
+    from ai_workflows.models import AITouchpoint
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    tp, _ = AITouchpoint.objects.get_or_create(key=key, defaults={"name": key.title()})
+
+    if "pinned_provider" in data:
+        tp.pinned_provider = (data["pinned_provider"] or "").strip()
+    if "pinned_model" in data:
+        tp.pinned_model = (data["pinned_model"] or "").strip()
+    if "allow_fallback" in data:
+        tp.allow_fallback = bool(data["allow_fallback"])
+    if "temperature_override" in data:
+        val = data["temperature_override"]
+        tp.temperature_override = float(val) if val is not None and str(val).strip() != "" else None
+    if "is_active" in data:
+        tp.is_active = bool(data["is_active"])
+
+    tp.save()
+
+    return JsonResponse({
+        "success": True,
+        "touchpoint": {
+            "key": tp.key,
+            "name": tp.name,
+            "pinned_provider": tp.pinned_provider,
+            "pinned_model": tp.pinned_model,
+            "allow_fallback": tp.allow_fallback,
+            "temperature_override": tp.temperature_override,
+            "is_active": tp.is_active,
+        }
+    })
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def toggle_provider(request, name):
+    """Toggle a provider's active/enabled state or set its default model."""
+    from ai_workflows.models import Provider
+    from ai_workflows.harness.providers import get_adapter
+
+    try:
+        adapter = get_adapter(name)
+    except KeyError:
+        return JsonResponse({"error": f"Unknown provider {name}"}, status=404)
+
+    try:
+        data = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        data = {}
+
+    row, _ = Provider.objects.get_or_create(
+        name=name,
+        defaults={
+            "billing": adapter.billing,
+            "preference": adapter.preference,
+            "enabled": adapter.default_enabled,
+        }
+    )
+
+    if "enabled" in data:
+        row.enabled = bool(data["enabled"])
+    if "default_model" in data:
+        row.default_model = (data["default_model"] or "").strip()
+    if "preference" in data:
+        row.preference = int(data["preference"])
+
+    row.save()
+
+    return JsonResponse({
+        "success": True,
+        "provider": {
+            "name": row.name,
+            "enabled": row.enabled,
+            "default_model": row.default_model,
+            "preference": row.preference,
+        }
+    })
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def codex_start_device_auth(request):
+    """Initiate ChatGPT Codex device code authorization."""
+    from ai_workflows.harness.codex_auth import CodexDeviceAuthService
+
+    res = CodexDeviceAuthService.start_device_auth()
+    return JsonResponse(res)
+
+
+@staff_member_required
+@require_http_methods(["GET"])
+def codex_poll_device_auth(request):
+    """Poll in-flight device auth status."""
+    from ai_workflows.harness.codex_auth import CodexDeviceAuthService
+
+    session_id = request.GET.get("session_id", "")
+    if not session_id:
+        return JsonResponse({"error": "session_id required"}, status=400)
+
+    res = CodexDeviceAuthService.poll_session(session_id)
+    return JsonResponse(res)
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def refresh_provider_catalogue(request):
+    """Trigger a refresh of the model catalogue across providers."""
+    from ai_workflows.harness.catalogue import refresh_all
+
+    try:
+        summary = refresh_all()
+        return JsonResponse({"success": True, "summary": summary})
+    except Exception as e:
+        logger.exception("[catalogue] Refresh failed: %s", e)
+        return JsonResponse({"error": str(e)}, status=500)
+

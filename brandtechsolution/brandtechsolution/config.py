@@ -215,6 +215,11 @@ class AppSettings(BaseSettings):
     # and off unless deliberately enabled -- see harness/providers.py for why.
     codex_oauth_token: str = ""
 
+    # Google Cloud Vertex AI Configuration (Service Account JSON & Project)
+    google_application_credentials: str = ""
+    vertex_project_id: str = ""
+    vertex_location: str = "us-central1"
+
     # Per-request ceiling for a chat model call, in seconds.
     llm_timeout: int = 60
 
@@ -302,6 +307,7 @@ SHARED_CREDENTIALS = (
     "DEEPSEEK_API_KEY",
     "OPENROUTER_API_KEY",
     "CODEX_OAUTH_TOKEN",
+    "GOOGLE_APPLICATION_CREDENTIALS",
     "LANGSMITH_API_KEY",
 )
 

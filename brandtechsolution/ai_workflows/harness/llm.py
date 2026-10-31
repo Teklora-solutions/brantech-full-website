@@ -61,6 +61,7 @@ ROLE_TEMPERATURE = {
 
 class Provider(str, Enum):
     GEMINI = "gemini"
+    VERTEX = "vertex"
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     DEEPSEEK = "deepseek"
@@ -109,6 +110,37 @@ def _require_credential(provider, model):
             provider=provider.value, model=model,
         )
     return secret
+
+
+def _vertex(role, tools, model, **overrides):
+    from google.oauth2 import service_account
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    import json
+    import os
+
+    cred_path = _require_credential(Provider.VERTEX, model)
+    credentials = None
+    project_id = getattr(config, "vertex_project_id", "")
+
+    if cred_path and os.path.exists(cred_path):
+        credentials = service_account.Credentials.from_service_account_file(cred_path)
+        if not project_id:
+            try:
+                with open(cred_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    project_id = data.get("project_id", "")
+            except Exception:
+                pass
+
+    kwargs = {
+        "model": model,
+        "credentials": credentials,
+        "temperature": ROLE_TEMPERATURE[role],
+        "timeout": getattr(config, "llm_timeout", REQUEST_TIMEOUT),
+        "max_retries": MAX_RETRIES,
+    }
+    kwargs.update(overrides)
+    return _build(ChatGoogleGenerativeAI, kwargs, Provider.VERTEX, tools)
 
 
 def _gemini(role, tools, model, **overrides):
@@ -188,13 +220,14 @@ def _build(client_class, kwargs, provider, tools):
 
 _BUILDERS = {
     Provider.GEMINI: _gemini,
+    Provider.VERTEX: _vertex,
     Provider.ANTHROPIC: _anthropic,
     **{p: _openai_compatible(p) for p in OPENAI_COMPATIBLE},
 }
 
 
 def iter_models(role=ModelRole.ANALYTIC, *, tools=None, provider=None, model=None,
-                agent=None, allow_fallback=True, **overrides):
+                agent=None, touchpoint=None, allow_fallback=True, **overrides):
     """Yield (provider, client) for each candidate, building them lazily.
 
     `get_model` returns the first one that builds, which covers a provider that
@@ -207,6 +240,26 @@ def iter_models(role=ModelRole.ANALYTIC, *, tools=None, provider=None, model=Non
     stop the newsroom", and a rate limit is the most common outage there is.
     """
     role = ModelRole(role)
+    tp_key = touchpoint or agent
+    if tp_key:
+        from ai_workflows.harness.touchpoints import (
+            get_or_create_touchpoint_row,
+            record_touchpoint_invocation,
+        )
+        try:
+            tp_row = get_or_create_touchpoint_row(tp_key)
+            if tp_row and not provider and tp_row.pinned_provider:
+                provider = tp_row.pinned_provider
+            if tp_row and not model and tp_row.pinned_model:
+                model = tp_row.pinned_model
+            if tp_row and tp_row.temperature_override is not None and "temperature" not in overrides:
+                overrides["temperature"] = tp_row.temperature_override
+            if tp_row and not tp_row.allow_fallback:
+                allow_fallback = False
+            record_touchpoint_invocation(tp_key)
+        except Exception as exc:
+            logger.debug("[llm] Touchpoint resolution notice: %s", exc)
+
     candidates = _candidates(
         provider=provider, model=model, allow_fallback=allow_fallback, agent=agent,
     )
@@ -254,7 +307,7 @@ def iter_models(role=ModelRole.ANALYTIC, *, tools=None, provider=None, model=Non
 
 
 def get_model(role=ModelRole.ANALYTIC, *, tools=None, provider=None, model=None,
-              agent=None, allow_fallback=True, **overrides):
+              agent=None, touchpoint=None, allow_fallback=True, **overrides):
     """A configured chat model for `role`.
 
     Raises `ModelUnavailable` rather than returning None. That is the whole
@@ -267,6 +320,25 @@ def get_model(role=ModelRole.ANALYTIC, *, tools=None, provider=None, model=None,
     after the first, so an agent that must not drift between models does not.
     """
     role = ModelRole(role)
+    tp_key = touchpoint or agent
+    if tp_key:
+        from ai_workflows.harness.touchpoints import (
+            get_or_create_touchpoint_row,
+            record_touchpoint_invocation,
+        )
+        try:
+            tp_row = get_or_create_touchpoint_row(tp_key)
+            if tp_row and not provider and tp_row.pinned_provider:
+                provider = tp_row.pinned_provider
+            if tp_row and not model and tp_row.pinned_model:
+                model = tp_row.pinned_model
+            if tp_row and tp_row.temperature_override is not None and "temperature" not in overrides:
+                overrides["temperature"] = tp_row.temperature_override
+            if tp_row and not tp_row.allow_fallback:
+                allow_fallback = False
+            record_touchpoint_invocation(tp_key)
+        except Exception as exc:
+            logger.debug("[llm] Touchpoint resolution notice: %s", exc)
 
     candidates = _candidates(
         provider=provider, model=model, allow_fallback=allow_fallback, agent=agent,

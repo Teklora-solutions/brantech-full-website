@@ -594,3 +594,72 @@ class ModelInvocation(models.Model):
     def __str__(self):
         cost = f"${self.cost_usd:.6f}" if self.cost_usd is not None else "unpriced"
         return f"{self.provider}/{self.model_id} {self.total_tokens}tok {cost}"
+
+
+# ============================================================
+# AI TOUCHPOINTS REGISTRY & LLM GOVERNANCE
+# ============================================================
+
+
+class AITouchpoint(models.Model):
+    """A declared point in the application where an LLM is invoked.
+
+    Auto-registered whenever code decorated with `@register_touchpoint` or
+    invoking `get_model(..., touchpoint="key")` runs. Allows platform operators
+    to pin a dedicated Provider + Model per touchpoint, override temperature or
+    fallback policy, and inspect invocation metrics directly from the admin panel.
+    """
+
+    key = models.CharField(
+        max_length=80,
+        unique=True,
+        db_index=True,
+        help_text="Unique slug for the touchpoint (e.g., 'assistant', 'writer', 'fact_verifier').",
+    )
+    name = models.CharField(max_length=120, help_text="Human-readable touchpoint name.")
+    description = models.TextField(blank=True, default='', help_text="What this touchpoint does.")
+    default_role = models.CharField(
+        max_length=40,
+        default='analytic',
+        help_text="Default model role (precise, analytic, creative, conversational).",
+    )
+
+    # Operator overrides (empty string means use global provider resolution)
+    pinned_provider = models.CharField(
+        max_length=40,
+        blank=True,
+        default='',
+        help_text="Pinned provider (e.g. 'gemini', 'openai', 'anthropic', 'deepseek', 'codex', 'vertex').",
+    )
+    pinned_model = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        help_text="Pinned model ID for this touchpoint. If empty and pinned_provider is set, uses provider default.",
+    )
+    allow_fallback = models.BooleanField(
+        default=True,
+        help_text="Whether this touchpoint can fall back to alternative providers on failure.",
+    )
+    temperature_override = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Optional custom temperature override.",
+    )
+
+    last_invoked_at = models.DateTimeField(null=True, blank=True)
+    total_invocations = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'key']
+        verbose_name = 'AI Touchpoint'
+        verbose_name_plural = 'AI Touchpoints'
+
+    def __str__(self):
+        override = f" -> {self.pinned_provider}/{self.pinned_model}" if self.pinned_provider else " (default)"
+        return f"{self.name} [{self.key}]{override}"
+
