@@ -4,6 +4,15 @@ This repository contains the enterprise Django web application for **Teklora Sol
 
 ---
 
+## Planned delivery: document library and EduShare dashboards
+
+The staff document library is **specified, not implemented**. It will support private research/meeting documents, per-document sharing, background embedding, and administrator-only approval for public-facing AI use. Embedding readiness does not grant public access.
+
+- [Library specification](docs/specs/2026-11-04-document-library-spec.md)
+- [Team task plan — Teklora library and EduShare student/admin dashboards](docs/plans/2026-11-04-library-and-edushare-delivery-plan.md)
+
+EduShare work remains in the separate `Teklora-solutions/school` repository. First-wave tasks **#32–#38 and #40** are now assigned in Teklora Admin; see the [task register](docs/plans/2026-11-04-first-wave-task-register.md). Later-wave allocations remain proposals. No library feature has been implemented or deployed. The approved scope includes document OCR and meeting notes uploaded as DOCX, not recording ingestion or audio/video transcription; all uploads require administrator clearance before external processing, separately from public approval.
+
 ## ⚡ Recent System Enhancements & Release Notes
 
 ### ⚖️ Lawyer-Grade Legal & Statutory Compliance Framework
