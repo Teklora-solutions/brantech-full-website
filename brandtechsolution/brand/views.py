@@ -784,6 +784,7 @@ def developer_agent_setup(request):
 
     base_url = request.build_absolute_uri('/').rstrip('/')
     mcp_script_url = f"{base_url}/developer/mcp/server.py"
+    skill_url = f"{base_url}/developer/skill/SKILL.md"
 
     return render(
         request,
@@ -794,6 +795,7 @@ def developer_agent_setup(request):
             'key': raw_key if is_valid_key else '<YOUR_TEKLORA_API_KEY>',
             'base_url': base_url,
             'mcp_script_url': mcp_script_url,
+            'skill_url': skill_url,
             'is_valid_key': is_valid_key,
         },
         content_type='text/markdown; charset=utf-8',
@@ -823,4 +825,27 @@ def developer_mcp_script(request):
     with open(script_path, 'r', encoding='utf-8') as f:
         content = f.read()
     return HttpResponse(content, content_type='text/x-python; charset=utf-8')
+
+
+def developer_skill_file(request):
+    """Serve canonical SKILL.md for the teklora-developer skill."""
+    import os
+    candidates = [
+        os.path.join(settings.BASE_DIR, '..', 'skills', 'teklora-developer', 'SKILL.md'),
+        os.path.join(settings.BASE_DIR, 'skills', 'teklora-developer', 'SKILL.md'),
+        os.path.join(os.path.dirname(settings.BASE_DIR), 'skills', 'teklora-developer', 'SKILL.md'),
+    ]
+    skill_path = None
+    for c in candidates:
+        if os.path.exists(c):
+            skill_path = c
+            break
+
+    if not skill_path:
+        raise Http404("Skill specification not found.")
+
+    with open(skill_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='text/markdown; charset=utf-8')
+
 

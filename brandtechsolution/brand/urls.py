@@ -49,6 +49,7 @@ urlpatterns = [
     path('developer/setup/', views.developer_agent_setup, name='developer-agent-setup'),
     path('developer/setup.md', views.developer_agent_setup_md, name='developer-agent-setup-md'),
     path('developer/mcp/server.py', views.developer_mcp_script, name='developer-mcp-script'),
+    path('developer/skill/SKILL.md', views.developer_skill_file, name='developer-skill-file'),
     path('privacy/', views.privacy_policy, name='privacy'),
     path('terms/', views.terms_conditions, name='terms'),
     path('signup/', views.signup_view, name='signup'),

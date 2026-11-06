@@ -12,15 +12,12 @@
 3. Configure `REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES']` in `brandtechsolution/settings.py` so API keys authenticate on DRF views.
 4. Run migrations for `staff`.
 
-### Phase 2: Developer Keys API & Auto-Setup Endpoint
-1. Implement views in `staff/api.py`:
-   - `developer_keys_list_create`: `GET` (list own keys), `POST` (create new key).
-   - `developer_key_revoke`: `POST` (revoke key).
-2. Wire URLs into `staff/api_urls.py`.
-3. Implement public/tokenized developer setup endpoint in `brand/views.py`:
-   - `/developer/setup/`: Renders both human-friendly HTML or raw Markdown (`text/markdown`) based on query param or `Accept` header.
-   - Includes prompt template, Claude Code command, Cursor configuration, Antigravity CLI config, and embedded skill definition.
-4. Implement `/developer/mcp/server.py` download endpoint.
+### Phase 2: Agent Auto-Setup Endpoints & Manifests
+1. Implement public/canonical developer setup endpoints in `brand/views.py`:
+   - `/developer/setup/` & `/developer/setup.md`: Renders Markdown setup instructions containing the 4 required steps: (1) skill installation, (2) MCP configuration, (3) updates & sync, (4) guiding the user on how to obtain their API key and where to set it.
+   - `/developer/skill/SKILL.md`: Endpoint serving the raw canonical skill document.
+   - `/developer/mcp/server.py`: Download endpoint serving the standalone MCP script.
+2. Note on API keys: Per user requirements, developer keys are issued and managed securely through the Django Admin (`/admin/staff/developerapikey/`) rather than self-service API generation endpoints, minimizing endpoint surface area.
 
 ### Phase 3: Zero-Dependency Teklora Developer MCP Server
 1. Create `brandtechsolution/scripts/teklora_mcp.py`:

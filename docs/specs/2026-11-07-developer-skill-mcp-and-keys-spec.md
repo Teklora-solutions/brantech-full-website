@@ -39,16 +39,15 @@ Teklora Solutions operates a hybrid engineering workforce combining human develo
 
 ---
 
-## 3. Web & API Endpoints
+## 3. Web & Setup Endpoints
 
 | Endpoint | Method | Permission | Description |
 |---|---|---|---|
 | `/admin-panel/?section=developer` | GET | Staff member | Developer & Agent UI section in Teklora Admin |
-| `/api/staff/developer/keys/` | GET | Staff member | List developer's active & revoked API keys |
-| `/api/staff/developer/keys/` | POST | Staff member | Generate a new key, returns plaintext secret once |
-| `/api/staff/developer/keys/<id>/revoke/` | POST | Staff member | Revoke an existing API key |
-| `/developer/setup/` | GET | Public / Key Query | Agent auto-setup instruction page & markdown instructions |
+| `/developer/setup/` (and `/developer/setup.md`) | GET | Public | Agent auto-setup manifest & 4-step instructions |
+| `/developer/skill/SKILL.md` | GET | Public | Canonical Teklora developer agent skill file |
 | `/developer/mcp/server.py` | GET | Public | Standalone zero-dependency Python MCP server script |
+| `/admin/staff/developerapikey/` | GET/POST | Platform Admin | Django Admin interface for issuing and revoking API keys |
 
 ---
 

@@ -22,52 +22,24 @@ class DeveloperApiKeyTests(TestCase):
         )
         self.client.force_login(self.user)
 
-    def test_generate_and_list_keys(self):
-        # 1. Generate key
-        resp = self.client.post(
-            "/api/staff/developer/keys/",
-            {"name": "Claude Code - Test Laptop"},
-            content_type="application/json",
-        )
-        self.assertEqual(resp.status_code, 201)
-        data = resp.json()
-        raw_key = data["key"]
+    def test_model_generate_key_and_hashing(self):
+        instance, raw_key = DeveloperApiKey.generate_key(self.user, "Claude Code - Test Laptop")
         self.assertTrue(raw_key.startswith("tkl_live_"))
-        self.assertEqual(data["name"], "Claude Code - Test Laptop")
-        self.assertTrue(data["prefix"].startswith("tkl_live_"))
-        self.assertIn("/developer/setup/?key=tkl_live_", data["setup_url"])
-        self.assertIn("Read instructions at", data["agent_prompt"])
-
-        # DB has hash, NOT plaintext
-        db_key = DeveloperApiKey.objects.get(pk=data["id"])
-        self.assertNotEqual(db_key.key_hash, raw_key)
-        self.assertEqual(db_key.key_hash, DeveloperApiKey.hash_key(raw_key))
-
-        # Audit entry exists
-        self.assertTrue(
-            AuditEntry.objects.filter(action="api_key_created", actor=self.user).exists()
-        )
-
-        # 2. List keys
-        list_resp = self.client.get("/api/staff/developer/keys/")
-        self.assertEqual(list_resp.status_code, 200)
-        keys_list = list_resp.json()
-        self.assertEqual(len(keys_list), 1)
-        self.assertNotIn("key", keys_list[0])  # Plaintext never returned in list
-        self.assertEqual(keys_list[0]["prefix"], db_key.prefix)
-
-    def test_revoke_developer_key(self):
-        instance, raw_key = DeveloperApiKey.generate_key(self.user, "Key to revoke")
+        self.assertEqual(instance.name, "Claude Code - Test Laptop")
+        self.assertTrue(instance.prefix.startswith("tkl_live_"))
         self.assertTrue(instance.is_active)
 
-        resp = self.client.post(f"/api/staff/developer/keys/{instance.pk}/revoke/")
-        self.assertEqual(resp.status_code, 200)
+        # DB has hash, NOT plaintext
+        self.assertNotEqual(instance.key_hash, raw_key)
+        self.assertEqual(instance.key_hash, DeveloperApiKey.hash_key(raw_key))
 
-        instance.refresh_from_db()
+        # String representation
+        self.assertIn("Claude Code - Test Laptop", str(instance))
+        self.assertIn(instance.prefix, str(instance))
+
+        # Revocation
+        instance.revoke()
         self.assertFalse(instance.is_active)
-        self.assertTrue(
-            AuditEntry.objects.filter(action="api_key_revoked", actor=self.user).exists()
-        )
 
     def test_api_key_authentication_on_endpoints(self):
         instance, raw_key = DeveloperApiKey.generate_key(self.user, "Bearer Auth Key")
@@ -111,30 +83,42 @@ class DeveloperApiKeyTests(TestCase):
         self.assertIn(resp.status_code, [401, 403])
 
     def test_developer_agent_setup_markdown_endpoint(self):
-        instance, raw_key = DeveloperApiKey.generate_key(self.user, "Setup Key")
-
-        # 1. With valid key in query param
-        resp = self.client.get(f"/developer/setup/?key={raw_key}")
+        resp = self.client.get("/developer/setup/")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("text/markdown", resp["Content-Type"])
         content = resp.content.decode("utf-8")
-        self.assertIn("dev_jane", content)
-        self.assertIn("Fullstack Engineer", content)
-        self.assertIn(raw_key, content)
+
+        # 1. How to get the skills
+        self.assertIn("Step 1: Install the Teklora Developer Skill", content)
+        self.assertIn("/developer/skill/SKILL.md", content)
+
+        # 2. MCP config
+        self.assertIn("Step 2: Install and Configure the Teklora MCP Server", content)
         self.assertIn("teklora_mcp.py", content)
         self.assertIn("claude mcp add", content)
 
-        # 2. Without key
-        anon_resp = self.client.get("/developer/setup/")
-        self.assertEqual(anon_resp.status_code, 200)
-        anon_content = anon_resp.content.decode("utf-8")
-        self.assertIn("<YOUR_TEKLORA_API_KEY>", anon_content)
+        # 3. How it will be receiving updates
+        self.assertIn("Step 3: How to Receive Updates", content)
+        self.assertIn("server.py", content)
+
+        # 4. Guide user on how to get the API key and where to put it
+        self.assertIn("Step 4: AGENT INSTRUCTION — Guide the User on Their API Key", content)
+        self.assertIn("TEKLORA_API_KEY", content)
+        self.assertIn("admin@teklora.co.ke", content)
 
     def test_developer_mcp_script_download(self):
         resp = self.client.get("/developer/mcp/server.py")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("text/x-python", resp["Content-Type"])
         self.assertIn("TekloraClient", resp.content.decode("utf-8"))
+
+    def test_developer_skill_download(self):
+        resp = self.client.get("/developer/skill/SKILL.md")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/markdown", resp["Content-Type"])
+        content = resp.content.decode("utf-8")
+        self.assertIn("name: teklora-developer", content)
+        self.assertIn("Teklora Solutions", content)
 
     def test_mcp_server_client_and_tools(self):
         from scripts.teklora_mcp import TekloraClient, handle_tool_call
