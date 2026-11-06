@@ -222,6 +222,10 @@
                 <span id="taskNavBadge"
                     class="nav-label hidden ml-auto text-xs px-2 py-0.5 rounded-full bg-brand-blue/20 text-brand-blue">0</span>
             </a>
+            <a href="/admin-panel/?section=developer" id="nav-developer"
+                class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-400 transition-colors">
+                <i class="fas fa-terminal w-6 text-center mr-3 text-emerald-400"></i><span class="nav-label">Developer &amp; Agents</span>
+            </a>
             {% if can.manage_projects or can.manage_blog or can.manage_appointments %}
             <div class="pt-4 pb-2 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider sidebar-header">Content</div>
             {% endif %}

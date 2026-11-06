@@ -1,0 +1,244 @@
+<div id="developer" class="section hidden animate-fade-in">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+        <div>
+            <div class="flex items-center gap-2.5 mb-1.5">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm">
+                    <i class="fas fa-terminal"></i>
+                </div>
+                <h2 class="text-2xl sm:text-3xl font-extrabold text-primaryText font-heading">Developer &amp; Agents</h2>
+            </div>
+            <p class="text-sm text-secondaryText">Manage your personal API keys and set up autonomous coding agents with one click.</p>
+        </div>
+        <button type="button" id="openNewKeyModalBtn"
+            class="bg-brandBlue hover:bg-sky-500 text-white font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-brandBlue/20 transition-all text-sm flex items-center gap-2">
+            <i class="fas fa-key"></i>
+            <span>Generate API Key</span>
+        </button>
+    </div>
+
+    <!-- Hero: Agent Auto-Setup Card -->
+    <div class="clean-card rounded-2xl p-6 sm:p-8 mb-8 border border-emerald-500/30 bg-gradient-to-br from-surface via-surface to-emerald-950/10 relative overflow-hidden group">
+        <div class="absolute -right-12 -top-12 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div class="max-w-2xl">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-3">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    <span>One-Click Agent Auto-Setup</span>
+                </div>
+                <h3 class="text-xl sm:text-2xl font-bold text-primaryText font-heading mb-2">
+                    Connect Your Favourite AI Agent
+                </h3>
+                <p class="text-sm text-secondaryText leading-relaxed">
+                    Copy the auto-setup link or prompt below and paste it into <span class="text-emerald-400 font-medium">Claude Code</span>, <span class="text-sky-400 font-medium">Cursor</span>, <span class="text-purple-400 font-medium">Antigravity</span>, or <span class="text-indigo-400 font-medium">Windsurf</span>. Your agent will read the instruction manifest, install the <strong class="text-primaryText">Teklora Developer Skill</strong>, and register the <strong class="text-primaryText">Teklora MCP Server</strong> automatically.
+                </p>
+            </div>
+        </div>
+
+        <!-- Setup Link & Prompt Input Group -->
+        <div class="mt-6 space-y-4">
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondaryText mb-2">
+                    Auto-Setup Link (Paste into agent prompt)
+                </label>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <div class="relative flex-1">
+                        <input id="agentSetupLinkInput" type="text" readonly
+                            placeholder="Generate an API key below to unlock your personalized link"
+                            class="w-full bg-background/80 border border-borderLight rounded-xl pl-4 pr-10 py-3 text-sm text-primaryText font-mono focus:outline-none focus:border-brandBlue transition-colors select-all">
+                        <button type="button" id="copySetupLinkBtn" title="Copy Link"
+                            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-secondaryText hover:text-white p-1.5 transition-colors">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <button type="button" id="copyAgentPromptBtn"
+                        class="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap shadow-lg shadow-emerald-500/10">
+                        <i class="fas fa-robot"></i>
+                        <span>Copy Agent Prompt</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pre-packaged agent commands preview tabs -->
+            <div class="pt-4 border-t border-borderLight/60">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-secondaryText">Quick Agent Configurations</span>
+                    <div class="flex gap-1.5 text-xs">
+                        <button type="button" data-agent-tab="claude" class="agent-tab px-3 py-1 rounded-lg bg-brandBlue/20 text-brandBlue font-medium transition-colors">Claude Code</button>
+                        <button type="button" data-agent-tab="cursor" class="agent-tab px-3 py-1 rounded-lg text-secondaryText hover:text-white font-medium transition-colors">Cursor / Windsurf</button>
+                        <button type="button" data-agent-tab="antigravity" class="agent-tab px-3 py-1 rounded-lg text-secondaryText hover:text-white font-medium transition-colors">Antigravity</button>
+                    </div>
+                </div>
+
+                <!-- Tab 1: Claude Code -->
+                <div id="agentTabClaude" class="agent-tab-content">
+                    <div class="bg-background/90 rounded-xl p-3.5 border border-borderLight font-mono text-xs text-primaryText flex items-center justify-between overflow-x-auto gap-4">
+                        <code id="claudeCodeSnippet">claude mcp add teklora python ~/.teklora/teklora_mcp.py --env TEKLORA_API_KEY="&lt;YOUR_KEY&gt;" TEKLORA_BASE_URL="{{ request.scheme }}://{{ request.get_host }}"</code>
+                        <button type="button" data-copy-target="claudeCodeSnippet" class="text-secondaryText hover:text-white transition-colors p-1" title="Copy">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Cursor / Windsurf -->
+                <div id="agentTabCursor" class="agent-tab-content hidden">
+                    <div class="bg-background/90 rounded-xl p-3.5 border border-borderLight font-mono text-xs text-primaryText relative overflow-x-auto">
+                        <pre id="cursorJsonSnippet">{
+  "mcpServers": {
+    "teklora": {
+      "command": "python",
+      "args": ["~/.teklora/teklora_mcp.py"],
+      "env": {
+        "TEKLORA_API_KEY": "&lt;YOUR_KEY&gt;",
+        "TEKLORA_BASE_URL": "{{ request.scheme }}://{{ request.get_host }}"
+      }
+    }
+  }
+}</pre>
+                        <button type="button" data-copy-target="cursorJsonSnippet" class="absolute top-3 right-3 text-secondaryText hover:text-white transition-colors p-1" title="Copy">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Antigravity -->
+                <div id="agentTabAntigravity" class="agent-tab-content hidden">
+                    <div class="bg-background/90 rounded-xl p-3.5 border border-borderLight font-mono text-xs text-primaryText relative overflow-x-auto">
+                        <p class="text-secondaryText mb-2">// Place in ~/.gemini/antigravity-cli/skills/teklora-developer/SKILL.md</p>
+                        <code id="antigravitySnippet">curl -fsSL "{{ request.scheme }}://{{ request.get_host }}/developer/setup/?key=&lt;YOUR_KEY&gt;"</code>
+                        <button type="button" data-copy-target="antigravitySnippet" class="absolute top-3 right-3 text-secondaryText hover:text-white transition-colors p-1" title="Copy">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Keys Management Table -->
+    <div class="clean-card rounded-2xl p-6 sm:p-8">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h3 class="text-lg font-bold text-primaryText font-heading">Active Developer API Keys</h3>
+                <p class="text-xs text-secondaryText mt-0.5">Keys authenticate your agents directly with DRF endpoints and MCP tools.</p>
+            </div>
+            <button type="button" id="refreshKeysBtn" class="text-xs text-secondaryText hover:text-primaryText border border-borderLight rounded-lg px-3 py-1.5 transition-colors flex items-center gap-1.5">
+                <i class="fas fa-rotate-right"></i>
+                <span>Refresh</span>
+            </button>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead>
+                    <tr class="border-b border-borderLight/60 text-xs font-semibold uppercase tracking-wider text-secondaryText">
+                        <th class="pb-3 px-4">Key Name</th>
+                        <th class="pb-3 px-4">Prefix</th>
+                        <th class="pb-3 px-4">Created</th>
+                        <th class="pb-3 px-4">Last Used</th>
+                        <th class="pb-3 px-4">Status</th>
+                        <th class="pb-3 px-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="developerKeysTableBody" class="divide-y divide-borderLight/40">
+                    <tr>
+                        <td colspan="6" class="py-8 text-center text-secondaryText">
+                            <i class="fas fa-spinner fa-spin mr-2"></i>Loading API keys...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 1: Create New Key Modal -->
+<div id="newKeyModal" class="fixed inset-0 bg-black/75 z-50 hidden items-center justify-center p-4">
+    <div class="bg-surface border border-borderLight rounded-2xl w-full max-w-md p-6 sm:p-8 shadow-2xl relative animate-fade-in">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-lg font-bold text-primaryText font-heading flex items-center gap-2">
+                <i class="fas fa-key text-brandBlue"></i>
+                <span>Generate Developer API Key</span>
+            </h3>
+            <button type="button" data-close-modal="newKeyModal" class="text-secondaryText hover:text-primaryText p-1 transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form id="newKeyForm" class="space-y-4">
+            <div>
+                <label for="newKeyName" class="block text-xs font-semibold uppercase tracking-wider text-secondaryText mb-2">Key Label / Device</label>
+                <input id="newKeyName" name="name" type="text" placeholder="e.g. Claude Code - MacBook Pro" required
+                    class="w-full bg-background border border-borderLight rounded-xl px-4 py-2.5 text-primaryText focus:outline-none focus:border-brandBlue text-sm transition-all">
+                <p class="text-xs text-secondaryText mt-1.5">A descriptive label to identify this key.</p>
+            </div>
+            <div class="flex justify-end gap-3 pt-3">
+                <button type="button" data-close-modal="newKeyModal"
+                    class="px-4 py-2.5 text-sm rounded-xl border border-borderLight text-secondaryText hover:text-white transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" id="submitCreateKeyBtn"
+                    class="bg-brandBlue hover:bg-sky-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-all flex items-center gap-2">
+                    <i class="fas fa-bolt"></i>
+                    <span>Generate Key</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 2: Key Created & Auto-Setup Reveal Modal -->
+<div id="keyCreatedModal" class="fixed inset-0 bg-black/80 z-50 hidden items-center justify-center p-4">
+    <div class="bg-surface border border-emerald-500/40 rounded-2xl w-full max-w-xl p-6 sm:p-8 shadow-2xl relative animate-fade-in">
+        <div class="flex items-center gap-3 mb-4 text-emerald-400">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-lg">
+                <i class="fas fa-circle-check"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-primaryText font-heading">Developer API Key Created</h3>
+                <p class="text-xs text-secondaryText">Copy your secret key now. For security, it will not be displayed again.</p>
+            </div>
+        </div>
+
+        <div class="space-y-4 my-5">
+            <!-- Plaintext Key Display -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondaryText mb-1.5">Secret Key</label>
+                <div class="flex items-center gap-2 bg-background border border-borderLight rounded-xl p-2.5 font-mono text-xs text-emerald-400">
+                    <span id="revealedSecretKey" class="flex-1 break-all select-all"></span>
+                    <button type="button" id="copyRevealedKeyBtn" class="text-secondaryText hover:text-white p-1.5 transition-colors" title="Copy Key">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Agent Setup Link -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondaryText mb-1.5">1-Click Agent Auto-Setup Link</label>
+                <div class="flex items-center gap-2 bg-background border border-borderLight rounded-xl p-2.5 font-mono text-xs text-sky-400">
+                    <span id="revealedSetupUrl" class="flex-1 break-all select-all"></span>
+                    <button type="button" id="copyRevealedUrlBtn" class="text-secondaryText hover:text-white p-1.5 transition-colors" title="Copy Link">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Ready Prompt for Agent -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondaryText mb-1.5">Ready Prompt for Your Agent</label>
+                <div class="bg-background border border-borderLight rounded-xl p-3 font-mono text-xs text-gray-300 relative group">
+                    <p id="revealedAgentPrompt" class="select-all pr-8"></p>
+                    <button type="button" id="copyRevealedPromptBtn" class="absolute top-2.5 right-2.5 text-secondaryText hover:text-white p-1 transition-colors" title="Copy Prompt">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end pt-2">
+            <button type="button" data-close-modal="keyCreatedModal"
+                class="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-6 py-2.5 rounded-xl text-sm transition-all">
+                I Have Saved My Key
+            </button>
+        </div>
+    </div>
+</div>

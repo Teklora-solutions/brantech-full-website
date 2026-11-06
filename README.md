@@ -127,6 +127,17 @@ The platform has undergone a complete architectural redesign for high visual imp
 
 ---
 
+## 🤖 Developer Portal, Agent Auto-Setup & MCP Server
+
+Teklora integrates native support for human software engineers and autonomous AI coding agents:
+
+- **Developer API Keys (`/admin-panel/?section=developer`)**: Staff members can generate and manage personal API keys (`tkl_live_...`) to authenticate CLI tools, agents, and external services without browser sessions. Keys are stored via SHA-256 hashes with visible prefix identification and full audit logs.
+- **One-Click Agent Auto-Setup Link (`/developer/setup/`)**: Developers can copy an auto-setup URL or prompt to paste into their favourite agent (Claude Code, Cursor, Google Antigravity, Windsurf, Cline). The endpoint dynamically renders tailored Markdown instructions, environment configurations, and skill loading instructions.
+- **Zero-Dependency Teklora Developer MCP Server (`brandtechsolution/scripts/teklora_mcp.py`)**: A standard JSON-RPC 2.0 stdio Model Context Protocol server exposing task management (`teklora_list_my_tasks`, `teklora_get_task_details`, `teklora_complete_task_assignment`), developer profiles (`teklora_get_developer_profile`), repository listings, and semantic knowledge search.
+- **Canonical Developer Skill (`skills/teklora-developer/SKILL.md`)**: Defines git branch standards (`<type>/<task-id>-<slug>`), Conventional Commits with task references (`feat(staff): [Task #41] ...`), the "Every Update" file maintenance contract, and the platform task ladder.
+
+---
+
 ## 🛠️ Project Setup Guide
 
 ### Prerequisites

@@ -77,6 +77,7 @@ function showSection(sectionName, clickedElement) {
     if (sectionName === 'campaigns') loadCampaigns();
     if (sectionName === 'staff') loadStaff();
     if (sectionName === 'tasks') loadTasks();
+    if (sectionName === 'developer' && typeof loadDeveloperKeys === 'function') loadDeveloperKeys();
 }
 
 function showAddForm(type) {

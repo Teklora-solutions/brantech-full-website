@@ -43,6 +43,12 @@ This document serves as the high-level roadmap and strategic milestone tracker f
   - [x] Show whether the GitHub key is a personal account or an organisation.
   - [x] Import roadmap leaf items automatically from GitHub-synced projects into a separate unassigned backlog with project filters and manager-led assignment (`docs/specs/2026-10-28-roadmap-backlog-spec.md`).
   - [x] Link task commits and submit closing commits or merged task branches for review through polling and an optional signed webhook; show project import status and task commit details in Admin Tasks (`docs/specs/2026-10-28-github-task-automation-spec.md`).
+  - [x] **Developer Skill, MCP Server & Agent Setup Link**:
+    - [x] Staff Developer API Keys (`DeveloperApiKey` model, key generation, prefixing, revocation, and DRF authentication).
+    - [x] Teklora Admin Developer & Agents workspace (`/admin-panel/?section=developer`) with 1-click agent setup link.
+    - [x] Agent setup instruction endpoint (`/developer/setup/`) serving tailored markdown setup instructions for autonomous agents.
+    - [x] Zero-dependency Teklora Developer MCP Server (`brandtechsolution/scripts/teklora_mcp.py`) exposing task management, profile, repos, and knowledge base search.
+    - [x] Teklora Developer Skill (`skills/teklora-developer/SKILL.md`) codifying architecture standards, task ladder, git conventions, and file maintenance contract.
   - [ ] Staff GitHub repository discovery: scan and import accessible repositories from configured staff GitHub profiles.
   - [ ] Automated PR status linking with Teklora Admin Tasks.
 - [ ] **Client Project Delivery Hub**:

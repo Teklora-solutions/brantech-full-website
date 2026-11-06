@@ -434,6 +434,17 @@ if 'test' in sys.argv:
     TURNSTILE_SITE_KEY = ''
 
 # ============================================================
+# REST FRAMEWORK & DEVELOPER API AUTHENTICATION
+# ============================================================
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'staff.authentication.DeveloperApiKeyAuthentication',
+    ],
+}
+
+# ============================================================
 # DEFAULT PRIMARY KEY FIELD
 # ============================================================
 

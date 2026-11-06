@@ -46,6 +46,9 @@ urlpatterns = [
     # No trailing slash: llmstxt.org specifies the file at /llms.txt exactly,
     # and that is the path assistants look for.
     path('llms.txt', views.llms_txt, name='llms_txt'),
+    path('developer/setup/', views.developer_agent_setup, name='developer-agent-setup'),
+    path('developer/setup.md', views.developer_agent_setup_md, name='developer-agent-setup-md'),
+    path('developer/mcp/server.py', views.developer_mcp_script, name='developer-mcp-script'),
     path('privacy/', views.privacy_policy, name='privacy'),
     path('terms/', views.terms_conditions, name='terms'),
     path('signup/', views.signup_view, name='signup'),

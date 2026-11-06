@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from django.conf import settings
 from django.db import models
 
@@ -46,6 +48,8 @@ class AuditEntry(models.Model):
         ("mail_limit_changed", "Mail sending limit changed"),
         ("mailbox_created", "Shared mailbox created"),
         ("mailbox_deleted", "Shared mailbox deleted"),
+        ("api_key_created", "Developer API key created"),
+        ("api_key_revoked", "Developer API key revoked"),
     ]
 
     actor = models.ForeignKey(
@@ -171,3 +175,81 @@ class StaffProfile(models.Model):
 
     def __str__(self):
         return f"Profile of {self.user}"
+
+
+class DeveloperApiKey(models.Model):
+    """API key for developers and autonomous coding agents.
+
+    Allows staff members to authenticate CLI tools, MCP servers, and AI
+    agents directly against Teklora APIs without session cookies.
+    The raw secret key is displayed only once upon generation; the database
+    stores only a cryptographically secure SHA-256 hash and a prefix for
+    identification in the UI.
+    """
+
+    KEY_PREFIX = "tkl_live_"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="developer_api_keys",
+    )
+    name = models.CharField(
+        max_length=100,
+        help_text="Name or device label, e.g. 'Claude Code' or 'Workstation Cursor'",
+    )
+    prefix = models.CharField(
+        max_length=20,
+        db_index=True,
+        help_text="Visible prefix for key identification in UI, e.g. tkl_live_8f3a...",
+    )
+    key_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+        help_text="SHA-256 hash of the full secret token",
+    )
+    scopes = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Permitted scopes, e.g. ['tasks', 'profile', 'knowledge_base']",
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "developer API key"
+        verbose_name_plural = "developer API keys"
+        default_permissions = ()
+
+    def __str__(self):
+        return f"{self.name} ({self.prefix}) - {self.user.username}"
+
+    @classmethod
+    def hash_key(cls, raw_key: str) -> str:
+        return hashlib.sha256(raw_key.strip().encode("utf-8")).hexdigest()
+
+    @classmethod
+    def generate_key(cls, user, name: str = "", scopes: list = None, expires_at=None):
+        """Generates a new secure API key and returns (instance, raw_key)."""
+        raw_token = f"{cls.KEY_PREFIX}{secrets.token_urlsafe(32)}"
+        key_hash = cls.hash_key(raw_token)
+        prefix = raw_token[:16] + "..."
+
+        instance = cls.objects.create(
+            user=user,
+            name=name.strip() or f"Key {secrets.token_hex(3)}",
+            prefix=prefix,
+            key_hash=key_hash,
+            scopes=scopes if scopes is not None else ["tasks", "profile", "knowledge_base"],
+            expires_at=expires_at,
+        )
+        return instance, raw_token
+
+    def revoke(self):
+        self.is_active = False
+        self.save(update_fields=["is_active"])
+
