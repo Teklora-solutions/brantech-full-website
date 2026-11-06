@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, Permission, User
 from django.test import TestCase
 
 from staff.models import AuditEntry, DeveloperApiKey, StaffProfile
@@ -20,6 +20,12 @@ class DeveloperApiKeyTests(TestCase):
             primary_role="Fullstack Engineer",
             coding_languages=["Python", "TypeScript"],
         )
+        # Grant generate_api_keys via Developer group
+        self.dev_group = Group.objects.create(name="Developer")
+        api_key_perm = Permission.objects.get(codename="generate_api_keys", content_type__app_label="staff")
+        self.dev_group.permissions.add(api_key_perm)
+        self.user.groups.add(self.dev_group)
+
         self.client.force_login(self.user)
 
     def test_model_generate_key_and_hashing(self):
@@ -40,6 +46,71 @@ class DeveloperApiKeyTests(TestCase):
         # Revocation
         instance.revoke()
         self.assertFalse(instance.is_active)
+
+    def test_generate_and_list_keys_api_with_role(self):
+        # 1. Generate key
+        resp = self.client.post(
+            "/api/staff/developer/keys/",
+            {"name": "Claude Code - Test Laptop"},
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        raw_key = data["key"]
+        self.assertTrue(raw_key.startswith("tkl_live_"))
+        self.assertEqual(data["name"], "Claude Code - Test Laptop")
+        self.assertTrue(data["prefix"].startswith("tkl_live_"))
+        self.assertIn("/developer/setup/?key=tkl_live_", data["setup_url"])
+        self.assertIn("Read instructions at", data["agent_prompt"])
+
+        # DB has hash, NOT plaintext
+        db_key = DeveloperApiKey.objects.get(pk=data["id"])
+        self.assertNotEqual(db_key.key_hash, raw_key)
+        self.assertEqual(db_key.key_hash, DeveloperApiKey.hash_key(raw_key))
+
+        # Audit entry exists
+        self.assertTrue(
+            AuditEntry.objects.filter(action="api_key_created", actor=self.user).exists()
+        )
+
+        # 2. List keys
+        list_resp = self.client.get("/api/staff/developer/keys/")
+        self.assertEqual(list_resp.status_code, 200)
+        keys_list = list_resp.json()
+        self.assertEqual(len(keys_list), 1)
+        self.assertNotIn("key", keys_list[0])  # Plaintext never returned in list
+        self.assertEqual(keys_list[0]["prefix"], db_key.prefix)
+
+        # 3. Revoke key
+        revoke_resp = self.client.post(f"/api/staff/developer/keys/{db_key.pk}/revoke/")
+        self.assertEqual(revoke_resp.status_code, 200)
+        db_key.refresh_from_db()
+        self.assertFalse(db_key.is_active)
+        self.assertTrue(
+            AuditEntry.objects.filter(action="api_key_revoked", actor=self.user).exists()
+        )
+
+    def test_cannot_generate_or_list_keys_without_role(self):
+        # User without generate_api_keys capability
+        unprivileged_user = User.objects.create_user(
+            username="unprivileged_staff",
+            email="unprivileged@teklora.co.ke",
+            password="test-password-123",
+            is_staff=True,
+        )
+        self.client.force_login(unprivileged_user)
+
+        # Listing forbidden
+        list_resp = self.client.get("/api/staff/developer/keys/")
+        self.assertEqual(list_resp.status_code, 403)
+
+        # Generating forbidden
+        post_resp = self.client.post(
+            "/api/staff/developer/keys/",
+            {"name": "Attempt Key"},
+            content_type="application/json",
+        )
+        self.assertEqual(post_resp.status_code, 403)
 
     def test_api_key_authentication_on_endpoints(self):
         instance, raw_key = DeveloperApiKey.generate_key(self.user, "Bearer Auth Key")
