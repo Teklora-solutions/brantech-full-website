@@ -12,6 +12,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Copy the application code
 COPY brandtechsolution/ ./brandtechsolution/
+COPY skills/ ./skills/
 COPY entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
