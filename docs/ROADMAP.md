@@ -86,22 +86,22 @@ This document serves as the high-level roadmap and strategic milestone tracker f
 
 ---
 
-### 📚 Milestone 6: Staff Document Library & Permission-Aware AI *(Planning)*
+### 📚 Milestone 6: Staff Document Library & Permission-Aware AI *(Active Implementation)*
 
-Specification: [Document library](specs/2026-11-04-document-library-spec.md). Team allocation and separate EduShare dashboard work: [Delivery plan](plans/2026-11-04-library-and-edushare-delivery-plan.md). Feature implementation remains pending; first-wave tasks #32–#38 are assigned in production ([register](plans/2026-11-04-first-wave-task-register.md)). EduShare tasks belong to the School repository backlog, not this roadmap's imports.
+Specification: [Document library](specs/2026-11-04-document-library-spec.md). Agreed ACL & retrieval contract: [Library ACL & Retrieval Contract](specs/2026-11-07-library-acl-and-retrieval-contract.md). Team allocation and separate EduShare dashboard work: [Delivery plan](plans/2026-11-04-library-and-edushare-delivery-plan.md). First-wave tasks #32–#38 and #40 are assigned in production ([register](plans/2026-11-04-first-wave-task-register.md)).
 
 - [x] Record user-approved library decisions and propose architecture, security gates, and cross-project task packets.
 - [x] Confirm administrator mapping, external-processing review policy, document/OCR scope including DOCX meeting notes (no recording ingestion/transcription), 25 MB document/scan limit, and 30-day live deletion purge policy.
 - [x] Create user-approved first-wave task assignments with repository links and dependency descriptions; hold Emmanuel.
+- [x] **[Task #33] Library ACL & Retrieval Foundation (`knowledge_base/library/`)**: Defined canonical contracts, deny-by-default policy engine (`LibraryPolicy`), safe retrieval adapter (`LibraryRetrievalEngine`), and test stubs (`InMemoryLibraryStore`). Enforced zero provider calls without administrator clearance, no public retrieval without publication approval, and memory isolation against generic unscoped recall (`scope=None`). All unit/integration tests passing.
+- [x] Document provider terms, restricted-data classification, document-processing worker capacity and backup expiry findings before processing is enabled (`docs/specs/2026-11-07-library-acl-and-retrieval-contract.md`).
 
 Implementation gates below are tracked in the manually issued task packets and later scope proposals, not additional imported task assignments:
 
-- Validate provider terms, restricted-data classification, document-processing worker capacity and backup expiry before enabling processing.
-- Add private document/version storage, per-document sharing, and administrator-only public review with audit history.
-- Add bounded asynchronous document OCR/extraction, chunking, embedding, retries, and version/deletion race protection.
-- Enforce actor/audience-aware AI retrieval and prevent generic-memory, fallback, cache, and citation leaks.
-- Build library browse/upload/detail UI, sharing controls, processing indicators, and administrator review queue.
-- Pass access-control, public-revocation, lifecycle, and operational acceptance gates before enabling the library.
+- [ ] Add private document/version storage, per-document sharing, and administrator-only public review with audit history (Task #34, Junior).
+- [ ] Add bounded asynchronous document OCR/extraction, chunking, embedding, retries, and version/deletion race protection (Task #34, Junior).
+- [ ] Build library browse/upload/detail UI, sharing controls, processing indicators, and administrator review queue (Tasks #35 & #40, jmunuve & Emmanuel).
+- [ ] Pass access-control, public-revocation, lifecycle, and operational acceptance gates before enabling the library.
 
 ---
 

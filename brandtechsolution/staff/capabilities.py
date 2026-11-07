@@ -48,6 +48,10 @@ CAPABILITY_GROUPS = [
             # administer accounts, and conflating them would make giving up an
             # unrelated permission the only way to stop being paged.
             ("receive_alerts", "Receive system health alerts"),
+            (
+                "approve_library_publication",
+                "Approve library documents for public retrieval and clear external processing",
+            ),
         ],
     ),
     (
