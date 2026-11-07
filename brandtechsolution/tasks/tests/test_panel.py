@@ -82,14 +82,16 @@ class NavGatingTest(TestCase):
         self.assertNotContains(response, 'id="nav-blogs"')
         self.assertNotContains(response, 'id="nav-campaigns"')
         self.assertNotContains(response, 'id="nav-staff"')
+        self.assertNotContains(response, 'id="nav-developer"')
 
     def test_links_appear_for_what_the_user_holds(self):
-        self.client.force_login(self._staff("manage_blog", "manage_staff"))
+        self.client.force_login(self._staff("manage_blog", "manage_staff", "generate_api_keys"))
 
         response = self.client.get("/admin-panel/")
 
         self.assertContains(response, 'id="nav-blogs"')
         self.assertContains(response, 'id="nav-staff"')
+        self.assertContains(response, 'id="nav-developer"')
         self.assertNotContains(response, 'id="nav-campaigns"')
 
     def test_tasks_link_is_ungated(self):
@@ -122,6 +124,14 @@ class PresetRoleTest(TestCase):
         self.assertTrue(
             group.permissions.filter(
                 codename="manage_tasks", content_type__app_label="staff"
+            ).exists()
+        )
+
+    def test_administrator_preset_can_generate_api_keys(self):
+        group = Group.objects.get(name="Administrator")
+        self.assertTrue(
+            group.permissions.filter(
+                codename="generate_api_keys", content_type__app_label="staff"
             ).exists()
         )
 

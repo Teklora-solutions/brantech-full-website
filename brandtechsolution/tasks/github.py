@@ -501,7 +501,10 @@ def poll_all():
         except Exception as exc:  # One bad repository must not stop the rest.
             from brand.github_cache import record_failure
             message = record_failure(f"task-repository:{repository.pk}", exc, full_name=repository.full_name)
-            logger.exception("Polling %s failed", repository.full_name)
+            if getattr(exc, "status", None) == 404:
+                logger.warning("Repository %s not found on GitHub (404); check if repository was renamed or deleted", repository.full_name)
+            else:
+                logger.exception("Polling %s failed", repository.full_name)
             Repository.objects.filter(pk=repository.pk).update(last_error=message)
             results[repository.full_name] = {"error": message}
     return results
