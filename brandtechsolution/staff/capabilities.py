@@ -50,6 +50,12 @@ CAPABILITY_GROUPS = [
             ("receive_alerts", "Receive system health alerts"),
         ],
     ),
+    (
+        "Developer Tools",
+        [
+            ("generate_api_keys", "Generate developer API keys"),
+        ],
+    ),
 ]
 
 ALL_CAPABILITIES = [

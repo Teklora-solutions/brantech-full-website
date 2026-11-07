@@ -5,7 +5,7 @@ from django.db.models import Count
 from rest_framework import serializers
 
 from .capabilities import CODENAMES
-from .models import AuditEntry, StaffInvitation
+from .models import AuditEntry, DeveloperApiKey, StaffInvitation
 from .handles import mailbox_address, needs_handle
 from .phone import normalize_phone
 from .signups import TAKEN, account_for
@@ -246,6 +246,10 @@ class InvitationSerializer(serializers.ModelSerializer):
                 "A staff account with this email already exists. "
                 "Edit that person's roles instead."
             )
+        if StaffInvitation.objects.filter(email__iexact=email, accepted_at__isnull=True).exists():
+            raise serializers.ValidationError(
+                "A pending invitation for this email already exists."
+            )
         return email
 
 
@@ -358,3 +362,28 @@ class PasswordChangeSerializer(serializers.Serializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError(exc.messages)
         return value
+
+
+class DeveloperApiKeySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeveloperApiKey
+        fields = [
+            "id",
+            "name",
+            "prefix",
+            "scopes",
+            "is_active",
+            "created_at",
+            "last_used_at",
+            "expires_at",
+        ]
+        read_only_fields = [
+            "id",
+            "prefix",
+            "is_active",
+            "created_at",
+            "last_used_at",
+            "expires_at",
+        ]
+
+

@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import F, Count
-from django.http import Http404, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -763,3 +763,89 @@ def blog_json(request, post_id):
         'user_liked': user_liked,
         'comments': comments
     })
+
+
+def developer_agent_setup(request):
+    """Serve developer agent onboarding instructions in Markdown."""
+    from staff.models import DeveloperApiKey, StaffProfile
+
+    raw_key = (request.GET.get('key') or request.META.get('HTTP_X_TEKLORA_API_KEY') or '').strip()
+    developer = None
+    profile = None
+    is_valid_key = False
+
+    if raw_key.startswith(DeveloperApiKey.KEY_PREFIX):
+        key_hash = DeveloperApiKey.hash_key(raw_key)
+        api_key = DeveloperApiKey.objects.filter(key_hash=key_hash, is_active=True).select_related('user').first()
+        if api_key and api_key.user.is_active:
+            developer = api_key.user
+            profile, _ = StaffProfile.objects.get_or_create(user=developer)
+            is_valid_key = True
+
+    base_url = request.build_absolute_uri('/').rstrip('/')
+    mcp_script_url = f"{base_url}/developer/mcp/server.py"
+    skill_url = f"{base_url}/developer/skill/SKILL.md"
+
+    return render(
+        request,
+        'brand/developer_agent_setup.md',
+        {
+            'developer': developer,
+            'profile': profile,
+            'key': raw_key if is_valid_key else '<YOUR_TEKLORA_API_KEY>',
+            'base_url': base_url,
+            'mcp_script_url': mcp_script_url,
+            'skill_url': skill_url,
+            'is_valid_key': is_valid_key,
+        },
+        content_type='text/markdown; charset=utf-8',
+    )
+
+
+def developer_agent_setup_md(request):
+    return developer_agent_setup(request)
+
+
+def developer_mcp_script(request):
+    """Serve the standalone zero-dependency Python MCP server script."""
+    import os
+    candidates = [
+        os.path.join(settings.BASE_DIR, 'scripts', 'teklora_mcp.py'),
+        os.path.join(settings.BASE_DIR, 'brandtechsolution', 'scripts', 'teklora_mcp.py'),
+    ]
+    script_path = None
+    for c in candidates:
+        if os.path.exists(c):
+            script_path = c
+            break
+
+    if not script_path:
+        raise Http404("MCP script not found.")
+
+    with open(script_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='text/x-python; charset=utf-8')
+
+
+def developer_skill_file(request):
+    """Serve canonical SKILL.md for the teklora-developer skill."""
+    import os
+    candidates = [
+        os.path.join(settings.BASE_DIR, '..', 'skills', 'teklora-developer', 'SKILL.md'),
+        os.path.join(settings.BASE_DIR, 'skills', 'teklora-developer', 'SKILL.md'),
+        os.path.join(os.path.dirname(settings.BASE_DIR), 'skills', 'teklora-developer', 'SKILL.md'),
+    ]
+    skill_path = None
+    for c in candidates:
+        if os.path.exists(c):
+            skill_path = c
+            break
+
+    if not skill_path:
+        raise Http404("Skill specification not found.")
+
+    with open(skill_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='text/markdown; charset=utf-8')
+
+

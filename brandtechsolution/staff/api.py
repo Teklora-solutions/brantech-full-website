@@ -2,6 +2,8 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.models import Group, User
 from django.db import transaction
 from django.db.models import Count
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -14,11 +16,12 @@ from brandtechsolution.ratelimit import rate_limited
 from .audit import record
 from .capabilities import CAPABILITY_GROUPS
 from .emails import send_invitation
-from .models import AuditEntry, StaffInvitation, StaffProfile
+from .models import AuditEntry, DeveloperApiKey, StaffInvitation, StaffProfile
 from .permissions import enforce_grantable_roles, has_capability
 from .signups import TAKEN as ACCOUNT_TAKEN, account_for
 from .serializers import (
     AuditEntrySerializer,
+    DeveloperApiKeySerializer,
     InvitationSerializer,
     MeSerializer,
     PasswordChangeSerializer,
@@ -436,3 +439,75 @@ def change_password(request):
     # signs them out of the tab they just changed it from.
     update_session_auth_hash(request._request, request.user)
     return Response({"ok": True})
+
+
+@api_view(["GET", "POST"])
+@permission_classes([has_capability("generate_api_keys")])
+def developer_keys(request):
+    """List authenticated staff member's API keys or generate a new one.
+    
+    Gated by the `generate_api_keys` capability.
+    """
+    if request.method == "GET":
+        keys = DeveloperApiKey.objects.filter(user=request.user)
+        return Response(DeveloperApiKeySerializer(keys, many=True).data)
+
+    # Rate limit key generation: max 10 per hour per user
+    if rate_limited(
+        request, "developer-key-create", limit=10, window_seconds=3600,
+        subject=f"user:{request.user.pk}",
+    ):
+        return Response(
+            {"detail": "Too many key creation requests. Please try again later."},
+            status=429,
+        )
+
+    name = (request.data.get("name") or "").strip()
+    if not name:
+        name = f"Key {timezone.now().strftime('%b %d %H:%M')}"
+
+    instance, raw_key = DeveloperApiKey.generate_key(user=request.user, name=name)
+
+    AuditEntry.objects.create(
+        actor=request.user,
+        action="api_key_created",
+        target_user=request.user,
+        summary=f"{request.user.username} created developer API key '{instance.name}' ({instance.prefix})",
+        detail={"key_id": instance.pk, "name": instance.name, "prefix": instance.prefix},
+    )
+
+    data = DeveloperApiKeySerializer(instance).data
+    data["key"] = raw_key
+
+    # Agent setup URLs & Prompt
+    base_url = request.build_absolute_uri("/").rstrip("/")
+    setup_url = f"{base_url}/developer/setup/?key={raw_key}"
+    data["setup_url"] = setup_url
+    data["agent_prompt"] = (
+        f"Read instructions at {setup_url} "
+        f"and set up the Teklora Developer skill and MCP server for me."
+    )
+    return Response(data, status=201)
+
+
+@api_view(["POST"])
+@permission_classes([has_capability("generate_api_keys")])
+def revoke_developer_key(request, pk):
+    """Revoke an existing developer API key.
+    
+    Gated by the `generate_api_keys` capability.
+    """
+    key = get_object_or_404(DeveloperApiKey, pk=pk, user=request.user)
+    key.revoke()
+
+    AuditEntry.objects.create(
+        actor=request.user,
+        action="api_key_revoked",
+        target_user=request.user,
+        summary=f"{request.user.username} revoked developer API key '{key.name}' ({key.prefix})",
+        detail={"key_id": key.pk, "name": key.name, "prefix": key.prefix},
+    )
+    return Response({"ok": True, "detail": "API key revoked successfully."})
+
+
+
