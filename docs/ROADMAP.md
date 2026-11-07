@@ -86,6 +86,25 @@ This document serves as the high-level roadmap and strategic milestone tracker f
 
 ---
 
+### 📚 Milestone 6: Staff Document Library & Permission-Aware AI *(Planning)*
+
+Specification: [Document library](specs/2026-11-04-document-library-spec.md). Team allocation and separate EduShare dashboard work: [Delivery plan](plans/2026-11-04-library-and-edushare-delivery-plan.md). Feature implementation remains pending; first-wave tasks #32–#38 are assigned in production ([register](plans/2026-11-04-first-wave-task-register.md)). EduShare tasks belong to the School repository backlog, not this roadmap's imports.
+
+- [x] Record user-approved library decisions and propose architecture, security gates, and cross-project task packets.
+- [x] Confirm administrator mapping, external-processing review policy, document/OCR scope including DOCX meeting notes (no recording ingestion/transcription), 25 MB document/scan limit, and 30-day live deletion purge policy.
+- [x] Create user-approved first-wave task assignments with repository links and dependency descriptions; hold Emmanuel.
+
+Implementation gates below are tracked in the manually issued task packets and later scope proposals, not additional imported task assignments:
+
+- Validate provider terms, restricted-data classification, document-processing worker capacity and backup expiry before enabling processing.
+- Add private document/version storage, per-document sharing, and administrator-only public review with audit history.
+- Add bounded asynchronous document OCR/extraction, chunking, embedding, retries, and version/deletion race protection.
+- Enforce actor/audience-aware AI retrieval and prevent generic-memory, fallback, cache, and citation leaks.
+- Build library browse/upload/detail UI, sharing controls, processing indicators, and administrator review queue.
+- Pass access-control, public-revocation, lifecycle, and operational acceptance gates before enabling the library.
+
+---
+
 ## ✅ Completed Milestones
 
 - [x] **Statutory Compliance & Legal Engine**: KDPA 2019 & GDPR compliant Privacy Policy and Terms of Service.
