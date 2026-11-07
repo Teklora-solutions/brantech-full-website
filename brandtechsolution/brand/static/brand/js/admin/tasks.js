@@ -61,6 +61,14 @@ function taskSameOrigin(next) {
 
 /* ---------- rendering helpers ---------- */
 
+function renderTaskMarkdown(rawText) {
+    if (!rawText) return '<p class="text-sm text-gray-500 italic">No description.</p>';
+    if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+        return marked.parse(rawText);
+    }
+    return `<div class="whitespace-pre-line">${escapeHtml(rawText)}</div>`;
+}
+
 // Priority is carried by the card's left edge, using the same border-l-4
 // device as the dashboard's stat cards - so urgency is legible while scanning
 // a column of cards, without a pill competing with the status for attention.
@@ -376,8 +384,8 @@ function taskActivityRow(entry) {
                     <span class="text-sm font-semibold text-white">${escapeHtml(entry.actor_name)}</span>
                     <span class="text-xs text-gray-600">${escapeHtml(when)}</span>
                 </div>
-                <div class="p-3 rounded-lg bg-[#06090F]/90 border border-white/5 text-gray-200 text-sm leading-relaxed whitespace-pre-line break-words">
-                    ${escapeHtml(entry.body)}
+                <div class="p-3 rounded-lg bg-[#06090F]/90 border border-white/5 text-gray-200 text-sm leading-relaxed github-readme-body break-words">
+                    ${renderTaskMarkdown(entry.body)}
                 </div>
             </div>
         </div>`;
@@ -437,8 +445,8 @@ function taskDetailBody(task, activity) {
         </div>
 
         ${task.description
-            ? `<div class="p-4 rounded-lg bg-[#06090F]/90 border border-white/5 text-gray-200 text-sm leading-relaxed whitespace-pre-line break-words">
-                ${escapeHtml(task.description)}
+            ? `<div class="p-4 rounded-lg bg-[#06090F]/90 border border-white/5 text-gray-200 text-sm leading-relaxed github-readme-body break-words">
+                ${renderTaskMarkdown(task.description)}
             </div>`
             : '<p class="text-sm text-gray-600 italic">No description.</p>'}
 

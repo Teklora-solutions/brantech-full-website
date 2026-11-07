@@ -1651,6 +1651,14 @@ html.dark .mobile-theme-pill:hover,
   line-height: 1.7;
 }
 
+.github-readme-body > :first-child {
+  margin-top: 0 !important;
+}
+
+.github-readme-body > :last-child {
+  margin-bottom: 0 !important;
+}
+
 .github-readme-body h1 {
   font-size: 1.5rem !important;
   font-weight: 700 !important;
