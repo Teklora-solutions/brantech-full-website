@@ -1,6 +1,9 @@
+import uuid
 from django.db import models
 from django.utils import timezone
 from pgvector.django import VectorField
+from django.conf import settings
+from .library.storage import library_storage, version_path
 
 
 class KnowledgeDocument(models.Model):
@@ -196,3 +199,92 @@ class Embedding(models.Model):
 
     def __str__(self):
         return f"{self.document} in {self.space}"
+
+
+class LibraryDocument(models.Model):
+    """Authoritative ACL and current-version pointer; never stored in vector metadata."""
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='library_documents')
+    title = models.CharField(max_length=300)
+    description = models.TextField(blank=True, max_length=5000)
+    category = models.CharField(max_length=80, default='general', db_index=True)
+    tags = models.JSONField(default=list, blank=True)
+    visibility = models.CharField(max_length=20, choices=[('private', 'Private'), ('organisation', 'Organisation staff')], default='private')
+    current_version = models.ForeignKey('LibraryVersion', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+
+class LibraryVersion(models.Model):
+    """Immutable original; processing and review states belong to the exact version."""
+    document = models.ForeignKey(LibraryDocument, on_delete=models.CASCADE, related_name='versions')
+    version_number = models.PositiveIntegerField()
+    original = models.FileField(storage=library_storage, upload_to=version_path)
+    original_filename = models.CharField(max_length=255)
+    detected_format = models.CharField(max_length=10)
+    size_bytes = models.PositiveIntegerField()
+    checksum_sha256 = models.CharField(max_length=64)
+    uploader = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='library_uploads')
+    upload_authority = models.BooleanField(default=False)
+    processing_state = models.CharField(max_length=30, default='awaiting_clearance', db_index=True)
+    clearance_state = models.CharField(max_length=20, default='pending', db_index=True)
+    public_approval_state = models.CharField(max_length=20, default='not_reviewed', db_index=True)
+    classification = models.CharField(max_length=40, default='internal_standard')
+    permitted_provider = models.CharField(max_length=40, blank=True)
+    safe_error_code = models.CharField(max_length=60, blank=True)
+    attempts = models.PositiveIntegerField(default=0)
+    processing_token = models.UUIDField(default=uuid.uuid4, editable=False)
+    processing_started_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['document', 'version_number'], name='library_unique_version')]
+
+
+class LibraryGrant(models.Model):
+    document = models.ForeignKey(LibraryDocument, on_delete=models.CASCADE, related_name='grants')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name='library_grants')
+    group = models.ForeignKey('auth.Group', null=True, blank=True, on_delete=models.CASCADE, related_name='library_grants')
+    access_level = models.CharField(max_length=10, choices=[('read', 'Read'), ('edit', 'Edit')], default='read')
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=(models.Q(user__isnull=False, group__isnull=True) | models.Q(user__isnull=True, group__isnull=False)), name='library_grant_one_subject'),
+            models.UniqueConstraint(fields=['document', 'user'], name='library_unique_user_grant'),
+            models.UniqueConstraint(fields=['document', 'group'], name='library_unique_group_grant'),
+        ]
+
+
+class LibraryChunk(models.Model):
+    version = models.ForeignKey(LibraryVersion, on_delete=models.CASCADE, related_name='chunks')
+    ordinal = models.PositiveIntegerField()
+    text = models.TextField()
+    page_or_section = models.CharField(max_length=100, blank=True)
+    content_hash = models.CharField(max_length=64)
+    memory_document = models.OneToOneField(MemoryDocument, null=True, blank=True, on_delete=models.SET_NULL, related_name='library_chunk')
+
+    @property
+    def document(self):
+        return self.version.document
+
+    @property
+    def document_id(self):
+        return self.version.document_id
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['version', 'ordinal'], name='library_unique_chunk')]
+        ordering = ['ordinal']
+
+
+class LibraryAudit(models.Model):
+    """Append-only decisions/access events. Never include extracted text or credentials."""
+    document = models.ForeignKey(LibraryDocument, on_delete=models.SET_NULL, null=True, related_name='audit_events')
+    version = models.ForeignKey(LibraryVersion, on_delete=models.SET_NULL, null=True, related_name='audit_events')
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='library_audit_events')
+    action = models.CharField(max_length=40, db_index=True)
+    details = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)

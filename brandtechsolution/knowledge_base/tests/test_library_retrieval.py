@@ -148,8 +148,8 @@ class MemoryIsolationTests(TestCase):
         self.assertIn("Public Editorial Article", unscoped_titles)
         self.assertNotIn("Confidential Board Minutes", unscoped_titles)
 
-    def test_authorized_library_memory_finds_library_records_when_explicitly_scoped(self):
-        """Explicitly scoped memory queries with scope='library' retrieve library records."""
+    def test_explicit_scope_cannot_bypass_library_authorization(self):
+        """A scope name is not an authorization context; use the ACL retrieval service."""
         lib_memory = Memory(embedder=self.embedder, scope="library")
         lib_memory.remember(
             "Private research paper on quantum computing benchmarks.",
@@ -158,4 +158,5 @@ class MemoryIsolationTests(TestCase):
 
         scoped_results = lib_memory.recall("Quantum computing benchmarks")
         scoped_titles = {r.title for r in scoped_results}
-        self.assertIn("Quantum Research Paper", scoped_titles)
+        self.assertNotIn("Quantum Research Paper", scoped_titles)
+        self.assertEqual(lib_memory.recall('quantum', scope=('library', 'staff_library')), [])

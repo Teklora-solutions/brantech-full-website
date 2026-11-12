@@ -105,7 +105,10 @@ def pending(space, *, scope=None, kind=None):
     """
     from knowledge_base.models import MemoryDocument
 
-    rows = MemoryDocument.objects.exclude(embeddings__space=space)
+    from knowledge_base.library.retrieval import PROTECTED_LIBRARY_SCOPES
+    # Library content requires its own current-version/clearance worker path.
+    # Generic backfills have no actor, classification or provider-clearance context.
+    rows = MemoryDocument.objects.exclude(embeddings__space=space).exclude(scope__in=PROTECTED_LIBRARY_SCOPES)
     if scope:
         rows = rows.filter(scope=scope)
     if kind:
@@ -225,6 +228,9 @@ def execute(plan, *, memory=None, batch_size=DEFAULT_BATCH_SIZE, on_batch=None):
     report = Report(space=space)
 
     documents = [document for document, _ in plan.documents]
+    from knowledge_base.library.retrieval import PROTECTED_LIBRARY_SCOPES
+    if any(document.scope in PROTECTED_LIBRARY_SCOPES for document in documents):
+        raise ValueError('Protected library records must be reprocessed through the cleared library worker.')
 
     for start in range(0, len(documents), batch_size):
         batch = documents[start:start + batch_size]

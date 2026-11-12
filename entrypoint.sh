@@ -45,6 +45,13 @@ case "$ROLE" in
         --concurrency="${CELERY_WORKER_CONCURRENCY:-2}"
     ;;
 
+  library-worker)
+    echo "[entrypoint] Starting isolated library processing worker..."
+    exec celery -A brandtechsolution worker \
+        --loglevel=info --queues=library_processing --concurrency=2 \
+        --hostname="library@%h" --max-tasks-per-child=10 --max-memory-per-child=400000
+    ;;
+
   beat)
     # --schedule under /tmp: the default writes celerybeat-schedule into the
     # working directory, which is read-only in some deployments and would

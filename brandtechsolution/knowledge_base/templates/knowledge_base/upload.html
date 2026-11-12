@@ -1,0 +1,8 @@
+{% extends 'knowledge_base/base.html' %}
+{% block library_content %}
+<h1>Upload a private document</h1>
+<p>Maximum 25 MB. PDF, DOCX meeting notes, TXT, Markdown, PNG or JPEG scans. No audio/video recordings. Processing begins only after administrator clearance; restricted personal/financial data must not be sent to external providers.</p>
+<form class="card" method="post" enctype="multipart/form-data" id="library-upload">{% csrf_token %}{{ form.as_p }}<button type="submit">Upload privately</button><p id="upload-status" role="status" aria-live="polite"></p></form>
+<p class="muted">Keep this page open until the server confirms success. Large uploads may take a moment.</p>
+<script>document.getElementById('library-upload').addEventListener('submit', function () { if (this.checkValidity()) { this.querySelector('button').disabled = true; document.getElementById('upload-status').textContent = 'Uploading… waiting for server confirmation.'; } });</script>
+{% endblock %}

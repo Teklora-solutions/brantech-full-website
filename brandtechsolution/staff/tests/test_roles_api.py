@@ -29,7 +29,7 @@ class CapabilityListTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual([g["label"] for g in data],
-                         ["Content", "Communications", "Administration"])
+                         ["Content", "Communications", "Administration", "Developer Tools"])
         flat = [c["codename"] for g in data for c in g["capabilities"]]
         # Derived from the registry rather than a second hardcoded count.
         # What this endpoint owes its caller is the WHOLE registry, grouped -

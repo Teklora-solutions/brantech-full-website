@@ -86,7 +86,7 @@ This document serves as the high-level roadmap and strategic milestone tracker f
 
 ---
 
-### 📚 Milestone 6: Staff Document Library & Permission-Aware AI *(Active Implementation)*
+### 📚 Milestone 6: Staff Document Library & Permission-Aware AI *(Implemented in checkout; release acceptance pending)*
 
 Specification: [Document library](specs/2026-11-04-document-library-spec.md). Agreed ACL & retrieval contract: [Library ACL & Retrieval Contract](specs/2026-11-07-library-acl-and-retrieval-contract.md). Team allocation and separate EduShare dashboard work: [Delivery plan](plans/2026-11-04-library-and-edushare-delivery-plan.md). First-wave tasks #32–#38 and #40 are assigned in production ([register](plans/2026-11-04-first-wave-task-register.md)).
 
@@ -98,10 +98,12 @@ Specification: [Document library](specs/2026-11-04-document-library-spec.md). Ag
 
 Implementation gates below are tracked in the manually issued task packets and later scope proposals, not additional imported task assignments:
 
-- [ ] Add private document/version storage, per-document sharing, and administrator-only public review with audit history (Task #34, Junior).
-- [ ] Add bounded asynchronous document OCR/extraction, chunking, embedding, retries, and version/deletion race protection (Task #34, Junior).
-- [ ] Build library browse/upload/detail UI, sharing controls, processing indicators, and administrator review queue (Tasks #35 & #40, jmunuve & Emmanuel).
-- [ ] Pass access-control, public-revocation, lifecycle, and operational acceptance gates before enabling the library.
+- [x] Add private document/version storage, per-document sharing, and administrator-only public review with audit history (Task #34 scope; implemented in checkout on 2026-11-12, not a task-board approval).
+- [x] Add bounded asynchronous document OCR/extraction, chunking, embedding, retries, and version/deletion race protection (Task #34 scope; dedicated worker and scheduled purge).
+- [x] Build library browse/upload/detail UI, sharing controls, processing indicators, and administrator review queue (Tasks #35 & #40 scope; `/library/`, linked from the panel).
+- [x] Exercise automated access-control, public-revocation, upload/download, worker-race and lifecycle regression gates using isolated PostgreSQL/pgvector and fake providers.
+- [x] Remove the library feature toggle entirely; staff navigation, pages, processing and public-approved retrieval are always available subject to existing authorization and review policies.
+- [ ] Complete real-worker OCR, mobile/desktop/keyboard browser acceptance, production storage/backup-retention verification and security/operational sign-off. No live task statuses changed. See [completion plan](plans/2026-11-12-library-completion-plan.md).
 
 ---
 

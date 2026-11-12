@@ -276,7 +276,7 @@ class NoProviderTests(TestCase):
         with patch("ai_workflows.harness.catalogue.can_serve", return_value=False):
             assistant = ChatAssistant(thread_id="t-outage")
 
-        self.assertEqual(len(assistant.tools), 3)
+        self.assertEqual(len(assistant.tools), 4)
 
 
 class ChatFailoverTests(TestCase):

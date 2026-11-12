@@ -68,13 +68,9 @@ class LibraryPolicy:
             else:
                 in_admin_group = False
 
-            if in_admin_group:
-                # If actor has Django's has_perm, check specific capability or fall back to preset
-                has_perm = getattr(actor, "has_perm", None)
-                if callable(has_perm):
-                    if has_perm(f"staff.{ADMIN_CAPABILITY}") or has_perm("staff.manage_staff"):
-                        return True
-                return True
+            if in_admin_group and getattr(actor, 'is_staff', False):
+                has_perm = getattr(actor, 'has_perm', None)
+                return bool(callable(has_perm) and has_perm(f'staff.{ADMIN_CAPABILITY}'))
 
         return False
 
@@ -112,6 +108,9 @@ class LibraryPolicy:
                 "Document has been deleted and cannot be accessed or retrieved.",
             )
 
+        if actor is not None and getattr(actor, 'is_authenticated', False) and not getattr(actor, 'is_active', False):
+            return PolicyDecision.deny('DEACTIVATED_DENIED', 'Account is deactivated.')
+
         # 2. Public Audience Evaluation
         if audience == Audience.PUBLIC:
             if action != LibraryAction.READ:
@@ -128,6 +127,8 @@ class LibraryPolicy:
                     "Document has no active version eligible for public retrieval.",
                 )
 
+            if getattr(document, 'current_version_id', None) != getattr(target_version, 'id', None):
+                return PolicyDecision.deny('STALE_VERSION', 'Only the current version may be retrieved.')
             approval_state = getattr(target_version, "public_approval_state", None)
             if approval_state != PublicApprovalState.APPROVED:
                 return PolicyDecision.deny(
@@ -135,6 +136,8 @@ class LibraryPolicy:
                     f"Document version is not approved for public retrieval (current state: {approval_state}).",
                 )
 
+            if getattr(target_version, 'clearance_state', None) != ProcessingClearanceState.APPROVED:
+                return PolicyDecision.deny('NOT_CLEARED', 'Processing clearance is required.')
             proc_state = getattr(target_version, "processing_state", None)
             if proc_state != ProcessingState.READY:
                 return PolicyDecision.deny(

@@ -1,6 +1,6 @@
 # Teklora document library specification
 
-Status: user-approved scope and policies; implementation pending. Updated 2026-11-04 after policy questionnaire.
+Status: user-approved scope and policies; checkout implementation completed on 2026-11-12; the library is always available to staff, with no feature toggle. Production release/security/operational acceptance remains pending. Original scope approved 2026-11-04.
 Repository: `Teklora-solutions/brantech-full-website`.
 Related delivery plan: [Library and EduShare task plan](../plans/2026-11-04-library-and-edushare-delivery-plan.md).
 
@@ -16,9 +16,21 @@ Related delivery plan: [Library and EduShare task plan](../plans/2026-11-04-libr
 - Embedding readiness and public approval are independent. A ready vector is never publication consent.
 - Deliver in Teklora first; EduShare dashboards remain a separate delivery workstream, not a second library implementation.
 
-## Current implementation and gaps
+## Implementation update — 2026-11-12
 
-Inspected at checkout `3a310f1`:
+Execution record: [Library completion plan](../plans/2026-11-12-library-completion-plan.md).
+
+- Domain persistence: `LibraryDocument`, `LibraryVersion`, `LibraryGrant`, `LibraryChunk`, `LibraryAudit` in the existing app; migrations `0005`/`0006`. Review history is append-only audit events linked to the exact version, with actor/time/classification/provider/reason for clearance and reason for publication decisions.
+- Staff HTML interfaces: `GET /library/`, `GET|POST /library/upload/`, `GET /library/<id>/`, `GET /library/<id>/download/`, `GET /library/review/?queue=clearance|public`; mutations use CSRF-protected `POST /library/<id>/actions/<action>/` and require the current `version_id`. Invalid/stale submissions show errors without applying changes; inaccessible objects return 404 and forbidden actions return 403.
+- Processing uses bounded local extraction, local Tesseract/Poppler OCR, and approved Gemini embeddings, without external OCR egress. Jobs run on a dedicated queue with 55s/60s soft/hard ceilings, independent job-generation tokens, three automatic attempts at most and explicit owner/editor retry. A worker killed mid-processing becomes a visible retryable failure through maintenance.
+- One SQL ACL selector is used before search/count/pagination and eligible-chunk joins precede semantic/lexical ranking. Generic memory cannot query library scopes even explicitly. Public assistant/newsroom suites receive only the public-library tool; an internal tool factory requires trusted actor binding and must not be mounted on public/shared chat.
+- All HTML/file responses are private/no-store; previews are escaped text, not rendered HTML/Markdown. Originals have no public storage URL. Administrator list/detail/retrieval accesses and downloads are audited.
+- Beat maintenance every 15 minutes removes deleted documents promptly, including originals, chunks and vector memory, rather than waiting the full 30 days. Rolled-back unreferenced originals older than one day are cleaned from private storage. Real backup expiry must be operator-verified; historical retention claims below are not operational evidence.
+- The operator requested removal of the feature toggle entirely. Staff pages, processing and public-approved retrieval are always available; document ACLs and per-version processing/public review gates are unchanged. No production migrations, assignments, task approvals, provider calls on real documents, or deployment were performed by this implementation.
+
+## Original implementation baseline and gaps
+
+Inspected at checkout `3a310f1` before this implementation:
 
 | Existing component | Reuse / limitation |
 | --- | --- |
@@ -29,7 +41,7 @@ Inspected at checkout `3a310f1`:
 | `knowledge_base/services/knowledge_graph.py` | Legacy search has no document ACL, including substring fallback. Do not ingest private library material through this path. |
 | Staff capability system, groups, audit; Celery/Redis | Reuse patterns, with explicit object permissions and new library audit actions. `is_staff` alone is not administrator status. |
 
-No evidence here establishes a current private-library leak: the library does not exist yet. These are integration risks to prevent.
+At that baseline there was no private document library, so these were integration risks rather than evidence of an existing private-library leak.
 
 ## Proposed architecture and decisions
 
@@ -85,4 +97,4 @@ Library list/search, upload, details/preview/download, share editor, external-pr
 - Test malformed/oversized/unsupported files, rejected audio/video uploads, OCR/extraction/embedding errors, retries, duplicate jobs, deletion/replacement during processing, and embedding-space changes. Assert zero external provider calls before administrator processing clearance and zero public retrieval before the separate publication approval.
 - Test prompt injection, tool actor spoofing, session/citation reuse, CSRF, upload/download safety, migration/rollback, and safe audit content.
 - Use stub providers in automated tests and a dedicated PostgreSQL/pgvector test database for vector integration. Run `python manage.py test knowledge_base ai_workflows staff tasks` in the configured development environment, not production.
-- David signs off security and retrieval isolation; Mugisha accepts operational workflow. Release behind a disabled-by-default library feature flag until gates pass. Disabling it blocks library endpoints/tools without changing existing editorial/site functionality.
+- David signs off security and retrieval isolation; Mugisha accepts operational workflow. There is no library feature toggle. Staff authentication, document permissions, processing clearance and separate public approval enforce the security boundary; operational verification is part of deployment, not a feature opt-in.

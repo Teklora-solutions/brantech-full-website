@@ -6,6 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Local document OCR; never send scans to an external OCR provider.
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Python dependencies first (better layer caching)
 COPY brandtechsolution/requirements.txt ./requirements.txt
 RUN pip install --upgrade pip && pip install -r requirements.txt

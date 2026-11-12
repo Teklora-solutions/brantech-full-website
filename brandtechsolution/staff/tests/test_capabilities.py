@@ -5,7 +5,7 @@ from staff.capabilities import ALL_CAPABILITIES, CODENAMES
 
 
 class CapabilityRegistryTest(TestCase):
-    def test_registry_has_sixteen_capabilities(self):
+    def test_registry_has_eighteen_capabilities(self):
         # Bumped from 11 when manage_tasks was added, from 12 when
         # receive_alerts was, from 13 for view_all_mail, from 14 for
         # manage_mail_limits; down to 12 when view_inbox, handle_inquiries and
@@ -14,7 +14,9 @@ class CapabilityRegistryTest(TestCase):
         # is a deliberate act: a new codename has to be given a migration and
         # a place in a preset role, and this test is what stops that being
         # forgotten.
-        self.assertEqual(len(ALL_CAPABILITIES), 16)
+        # Library publication approval (staff.0027/0028) and developer API
+        # keys (staff.0025/0026) bring the existing registry to eighteen.
+        self.assertEqual(len(ALL_CAPABILITIES), 18)
 
     def test_codenames_are_unique(self):
         self.assertEqual(len(CODENAMES), len(set(CODENAMES)))

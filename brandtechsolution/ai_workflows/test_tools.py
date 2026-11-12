@@ -93,24 +93,24 @@ class RegistryTests(TestCase):
 class SuiteTests(TestCase):
     def setUp(self):
         self.registry = ToolRegistry()
-        for name in ("search_blog_posts", "search_projects", "current_time"):
+        for name in ("search_blog_posts", "search_projects", "current_time", "search_public_library"):
             self.registry.register(name, _fake_tool(name))
         self.registry.register_factory(
             "user_info", lambda ctx: _fake_tool("user_info") if ctx.user_id else None
         )
 
-    def test_the_assistant_gets_its_four_tools(self):
+    def test_the_assistant_gets_its_five_tools(self):
         resolved = suite_for("assistant", ToolContext(user_id=1), registry=self.registry)
         self.assertEqual(
             [t.name for t in resolved],
-            ["search_blog_posts", "search_projects", "user_info", "current_time"],
+            ["search_blog_posts", "search_projects", "user_info", "current_time", "search_public_library"],
         )
 
-    def test_an_anonymous_assistant_gets_three(self):
-        """Still no user tool: there is no user for it to describe."""
+    def test_an_anonymous_assistant_gets_four(self):
+        """Public library access adds no user tool or private document access."""
         resolved = suite_for("assistant", ToolContext(), registry=self.registry)
         self.assertEqual([t.name for t in resolved],
-                         ["search_blog_posts", "search_projects", "current_time"])
+                         ["search_blog_posts", "search_projects", "current_time", "search_public_library"])
 
     def test_an_agent_with_no_suite_gets_nothing_rather_than_everything(self):
         """Defaulting to every tool would quietly hand each new tool to agents
@@ -142,7 +142,7 @@ class SuiteTests(TestCase):
 class BuiltinRegistrationTests(TestCase):
     BUILTINS = [
         "current_time", "fetch_url", "search_blog_posts", "search_knowledge",
-        "search_projects", "user_info",
+        "search_projects", "search_public_library", "user_info",
     ]
 
     def test_every_builtin_tool_registers(self):
@@ -177,7 +177,7 @@ class BuiltinRegistrationTests(TestCase):
 
 
 class AssistantWiringTests(TestCase):
-    """The assistant's tools must be unchanged by the move."""
+    """The assistant receives public references, never private library tools."""
 
     def _assistant(self, **kwargs):
         from ai_workflows.service import ChatAssistant
@@ -190,12 +190,12 @@ class AssistantWiringTests(TestCase):
                 patch("ai_workflows.service.create_react_agent"):
             return ChatAssistant(thread_id="t-1", **kwargs)
 
-    def test_an_authenticated_assistant_gets_four_tools(self):
+    def test_an_authenticated_assistant_gets_five_tools(self):
         user = User.objects.create_user("someone", email="a@example.com")
-        self.assertEqual(len(self._assistant(user_id=user.pk).tools), 4)
+        self.assertEqual(len(self._assistant(user_id=user.pk).tools), 5)
 
-    def test_an_anonymous_assistant_gets_three(self):
-        self.assertEqual(len(self._assistant().tools), 3)
+    def test_an_anonymous_assistant_gets_four(self):
+        self.assertEqual(len(self._assistant().tools), 4)
 
     def test_tools_can_still_be_switched_off_entirely(self):
         self.assertEqual(self._assistant(use_tools=False).tools, [])
