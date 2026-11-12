@@ -4,6 +4,8 @@ Status: user-approved first-wave assignment execution; later-wave packets remain
 Date: 2026-11-04. No deadlines or workload capacity have been agreed.
 Specification: [Document library](../specs/2026-11-04-document-library-spec.md).
 
+2026-11-12 update: the operator requested direct completion of the Teklora library work. Backend, processing and staff UI are implemented in the checkout and always available to staff under the document permission/review policies; see the [completion plan](2026-11-12-library-completion-plan.md) for verification and remaining release gates. This does not change the live assignments/statuses below, and does not include EduShare dashboard delivery.
+
 ## Scope and people
 
 Two repositories, three workstreams: Teklora document library; EduShare student dashboard; EduShare admin dashboard. The user approved the library policies and first-wave assignment to active staff, holding Emmanuel. EduShare scope is confirmed as audit plus targeted fixes, not a redesign or new billing/financial/AI behaviour. School-local specification: `docs/specs/2026-11-04-dashboard-audit-and-targeted-fixes-spec.md`.

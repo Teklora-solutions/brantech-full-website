@@ -277,7 +277,7 @@ class SuiteTests(TestCase):
 
     def test_the_verifier_can_check_claims_against_something_outside_itself(self):
         """Until step 9 it asked a language model whether it believed itself."""
-        self.assertEqual(SUITES["fact_verifier"], ["search_knowledge", "fetch_url"])
+        self.assertEqual(SUITES["fact_verifier"], ["search_knowledge", "fetch_url", "search_public_library"])
 
     def test_the_researcher_can_read_the_sources_it_cites(self):
         self.assertIn("fetch_url", SUITES["research"])

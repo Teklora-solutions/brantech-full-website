@@ -210,6 +210,11 @@
             Tasks is the one deliberate exception: every staff account can
             open the board, so it carries no gate. See _tasks.html.
             {% endcomment %}
+            {% if request.user.is_staff %}
+            <a href="{% url 'library:index' %}" id="nav-library" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-400 transition-colors">
+                <i class="fas fa-book w-6 text-center mr-3"></i><span class="nav-label">Knowledge Library</span>
+            </a>
+            {% endif %}
             <a href="/admin-panel/?section=tasks" id="nav-tasks"
                 class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-400 transition-colors">
                 <i class="fas fa-list-check w-6 text-center mr-3"></i><span class="nav-label">Tasks</span>

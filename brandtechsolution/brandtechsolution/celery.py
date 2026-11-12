@@ -40,6 +40,13 @@ def setup_periodic_tasks(sender, **kwargs):
     from messaging.tasks import process_email_outbox_task
     from ai_workflows.tasks import refresh_catalogue_task
     from tasks.tasks import poll_repositories_task
+    from knowledge_base.tasks import maintain_library
+
+    sender.add_periodic_task(
+        crontab(minute='*/15'), maintain_library.s(),
+        name='purge deleted library content and recover interrupted processing',
+        options={'expires': 900},
+    )
 
     sender.add_periodic_task(
         settings.BEAT_OUTBOX_INTERVAL,

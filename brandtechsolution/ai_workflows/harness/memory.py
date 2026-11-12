@@ -205,11 +205,10 @@ class Memory:
             scope = self.scope
         if scope is not None:
             rows = rows.filter(document__scope__in=_as_scopes(scope))
-        else:
-            # Exclude protected document library records from generic unscoped recall
-            # to prevent unauthorized access and RAG leakage.
-            from knowledge_base.library.retrieval import PROTECTED_LIBRARY_SCOPES
-            rows = rows.exclude(document__scope__in=PROTECTED_LIBRARY_SCOPES)
+        # Generic memory has no authenticated ACL context. Explicit scope names
+        # must not provide a bypass; library retrieval uses its own joined query.
+        from knowledge_base.library.retrieval import PROTECTED_LIBRARY_SCOPES
+        rows = rows.exclude(document__scope__in=PROTECTED_LIBRARY_SCOPES)
 
         if kind:
             rows = rows.filter(document__kind=kind)

@@ -70,6 +70,8 @@ services:
     volumes:
       # Same media mount as web: the visual agent writes generated assets.
       - ./data/media:/app/brandtechsolution/media
+      # Scheduled library purge runs on the default queue.
+      - ./data/private:/app/brandtechsolution/private
       # Service account credentials for Vertex AI / GCP
       - ./credentials:/app/brandtechsolution/credentials:ro
     command: ["worker"]
@@ -79,6 +81,25 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  library-worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_HOST: db
+      REDIS_HOST: redis
+      LANGSMITH_TRACING: "false"
+    volumes:
+      - ./data/private:/app/brandtechsolution/private
+    command: ["library-worker"]
+    mem_limit: 1g
+    cpus: 2
     depends_on:
       db:
         condition: service_healthy

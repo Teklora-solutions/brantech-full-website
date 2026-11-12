@@ -48,9 +48,11 @@ class LibraryRetrievalEngine:
     ) -> List[LibraryRetrievalResult]:
         """Execute permission-gated semantic/lexical chunk retrieval."""
         results: List[LibraryRetrievalResult] = []
+        if self.store is None and candidate_chunks is None:
+            return self._retrieve_database(query, actor, audience, limit, category)
 
-        # If candidate chunks are passed directly (e.g. from a vector store or test harness)
-        chunks = candidate_chunks or (self.store.list_chunks() if self.store else [])
+        # Explicit test/store adapters still pass through the same policy.
+        chunks = candidate_chunks if candidate_chunks is not None else (self.store.list_chunks() if self.store else [])
 
         for chunk in chunks:
             doc = self._resolve_document(chunk)
@@ -59,6 +61,10 @@ class LibraryRetrievalEngine:
 
             ver = self._resolve_version(chunk, doc)
             if ver is None:
+                continue
+            if getattr(doc, 'current_version_id', None) != getattr(ver, 'id', None):
+                continue
+            if getattr(ver, 'processing_state', None) != ProcessingState.READY:
                 continue
 
             if category and getattr(doc, "category", None) != category:
@@ -107,6 +113,94 @@ class LibraryRetrievalEngine:
         # Rank by score descending and apply limit
         results.sort(key=lambda r: r.score, reverse=True)
         return results[:limit]
+
+    def _retrieve_database(self, query, actor, audience, limit, category):
+        """Lexical retrieval with ACL/state joins before ranking, no egress or cache."""
+        from .access import eligible_chunks
+        if not query.strip():
+            return []
+        if actor is not None and getattr(actor, 'is_authenticated', False) and not actor.is_active:
+            return []
+        rows = eligible_chunks(actor, public=audience == Audience.PUBLIC)
+        if category:
+            rows = rows.filter(version__document__category=category)
+        # Narrow candidates in SQL first; never load an inaccessible chunk.
+        from django.db.models import Q
+        predicate = Q()
+        for word in query.split()[:20]:
+            predicate |= Q(text__icontains=word)
+        rows = rows.filter(predicate)
+        def candidates():
+            for chunk in rows.iterator():
+                version = chunk.version
+                doc = version.document
+                yield LibraryRetrievalResult(
+                    document_id=doc.pk, version_id=version.pk, title=doc.title,
+                    page_or_section=chunk.page_or_section, text=chunk.text,
+                    score=self._compute_similarity(query, chunk.text),
+                    citation=f'[Doc #{doc.pk} v{version.version_number}: {doc.title}, {chunk.page_or_section}]',
+                    visibility=doc.visibility, is_public=version.public_approval_state == 'approved',
+                )
+        import heapq
+        selected = heapq.nlargest(max(0, min(int(limit), 20)), candidates(), key=lambda item: item.score)
+        self._audit_admin_results(actor, selected)
+        return selected
+
+    def retrieve_semantic(self, query, actor=None, *, audience=Audience.INTERNAL, limit=5, embedder=None):
+        """Rank only eligible joined chunks in the current embedding space.
+
+        No generic Memory.recall call: scope strings cannot authorize retrieval.
+        Callers may explicitly choose lexical `retrieve` when semantic memory is down.
+        """
+        from pgvector.django import CosineDistance
+        from ai_workflows.harness.memory import Memory
+        from knowledge_base.models import EmbeddingSpace
+        from .access import eligible_chunks
+        from langsmith import tracing_context
+        if not query.strip():
+            return []
+        if actor is not None and getattr(actor, 'is_authenticated', False) and not actor.is_active:
+            return []
+        rows = eligible_chunks(actor, public=audience == Audience.PUBLIC)
+        if not rows.exists():
+            return []
+        space = EmbeddingSpace.active()
+        if not space:
+            from ai_workflows.harness.errors import MemoryUnavailable
+            raise MemoryUnavailable('Library semantic search has no active embedding space.')
+        if embedder is None:
+            from brandtechsolution.config import config
+            if space.provider != 'gemini' or space.model_id.removeprefix('models/') != config.gemini_embedding_model.removeprefix('models/'):
+                from ai_workflows.harness.errors import MemoryUnavailable
+                raise MemoryUnavailable('Library embedding provider/model does not match the active space.')
+        # Query text is user-supplied; no document text is sent to the embedder.
+        with tracing_context(enabled=False):
+            vector = Memory(embedder=embedder)._embed(query, space)
+        rows = rows.filter(memory_document__embeddings__space=space).annotate(
+            distance=CosineDistance('memory_document__embeddings__vector', vector),
+        ).order_by('distance')[:max(0, min(int(limit), 20))]
+        results = []
+        for chunk in rows:
+            version, document = chunk.version, chunk.version.document
+            results.append(LibraryRetrievalResult(
+                document_id=document.pk, version_id=version.pk, title=document.title,
+                page_or_section=chunk.page_or_section, text=chunk.text,
+                score=1.0 - float(chunk.distance),
+                citation=f'[Doc #{document.pk} v{version.version_number}: {document.title}, {chunk.page_or_section}]',
+                visibility=document.visibility, is_public=version.public_approval_state == 'approved',
+            ))
+        self._audit_admin_results(actor, results)
+        return results
+
+    @staticmethod
+    def _audit_admin_results(actor, results):
+        if actor is None or not LibraryPolicy.is_administrator(actor):
+            return
+        from knowledge_base.models import LibraryAudit
+        LibraryAudit.objects.bulk_create([
+            LibraryAudit(document_id=doc_id, version_id=version_id, actor=actor, action='admin_retrieve')
+            for doc_id, version_id in {(item.document_id, item.version_id) for item in results}
+        ])
 
     def _resolve_document(self, chunk: Any) -> Optional[Any]:
         if hasattr(chunk, "document") and chunk.document is not None:

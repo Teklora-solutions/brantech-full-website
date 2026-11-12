@@ -123,7 +123,7 @@ All entities are codified in `knowledge_base.library.contracts`:
 ### 4.3 Backup-Expiry & 30-Day Purge Findings
 1. **Synchronous Immediate Invalidation**: Setting `is_deleted = True` synchronously cuts off all internal and public retrieval, streaming, and metadata viewing.
 2. **Asynchronous 30-Day Purge**: A scheduled Celery maintenance task purges underlying storage files, extracted text, chunk rows, vector embeddings, and search caches for documents deleted more than 30 days prior.
-3. **Backup Audit**: Production automated database snapshots follow a standard rolling 30-day retention cycle. Because database backups are immutable tape/snapshot archives, automated purge applies strictly to live primary stores; backup snapshots expire naturally within 30 days in full compliance with KDPA 2019 and GDPR standards.
+3. **Backup Release Gate**: Verify the actual database AND original-file backup configuration with the operator before release. The earlier assertion of a rolling 30-day production snapshot policy was not supported by operational evidence in this checkout. Live-store purge does not establish backup erasure or legal compliance. Record observed retention, restore/redeletion procedures and expiry evidence; keep release acceptance pending until verified.
 
 ---
 
@@ -132,7 +132,7 @@ All entities are codified in `knowledge_base.library.contracts`:
 The AI harness memory system (`ai_workflows/harness/memory.py:Memory.recall`) has been hardened:
 - Protected library documents are isolated in `PROTECTED_LIBRARY_SCOPES = ("library", "staff_library")`.
 - Generic unscoped queries (`scope=None`) automatically exclude protected library scopes via `rows.exclude(document__scope__in=PROTECTED_LIBRARY_SCOPES)`.
-- Library records can only be queried through the authorized `LibraryRetrievalEngine` or by explicitly authenticated library callers.
+- Library records can only be queried through the authorized `LibraryRetrievalEngine`. The 2026-11-12 implementation also excludes protected scopes from explicitly scoped generic recall: a scope string is not authorization. Database retrieval joins current-version, readiness, clearance and actor/public approval predicates before ranking.
 
 ---
 

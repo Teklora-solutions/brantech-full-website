@@ -23,6 +23,7 @@ urlpatterns = [
     path('staff/', include('staff.urls')),
 
     path('editorial/', include('editorial.urls')),
+    path('library/', include('knowledge_base.urls')),
 
     path('research/', views.research, name='research'),
     path('accounts/login/', views.login_view),

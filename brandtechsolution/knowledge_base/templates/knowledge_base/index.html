@@ -1,0 +1,15 @@
+{% extends 'knowledge_base/base.html' %}
+{% block library_content %}
+<h1>{% if queue == 'public' %}Public publication review{% elif queue %}External-processing clearance{% else %}Knowledge library{% endif %}</h1>
+<p class="muted">Private documents, shared knowledge, and administrator-reviewed AI references. Uploads remain private unless explicitly shared.</p>
+{% if not queue %}<form method="get" role="search"><label for="library-query">Search permitted documents and extracted text</label><input id="library-query" name="q" value="{{ query }}" maxlength="200"><button>Search</button></form>{% endif %}
+{% for document in page_obj %}
+<article class="card">
+<h2><a href="{% url 'library:detail' document.pk %}">{{ document.title }}</a></h2>
+<p>{{ document.description|truncatechars:220 }}</p>
+<p class="muted">{{ document.category }} · {{ document.owner.username }} · {{ document.get_visibility_display }}</p>
+{% with version=document.current_version %}<span class="badge">Processing: {{ version.processing_state }}</span><span class="badge">Clearance: {{ version.clearance_state }}</span><span class="badge">Public use: {{ version.public_approval_state }}</span>{% endwith %}
+</article>
+{% empty %}<p class="card">No documents available here. Upload a document or ask its owner to share access.</p>{% endfor %}
+<nav aria-label="Pagination">{% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}&amp;q={{ query|urlencode }}&amp;queue={{ queue|urlencode }}">Previous</a>{% endif %}<span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}&amp;q={{ query|urlencode }}&amp;queue={{ queue|urlencode }}">Next</a>{% endif %}</nav>
+{% endblock %}

@@ -134,16 +134,17 @@ SUITES = {
     # interpolated into the system prompt on every request, which is the front
     # of the cached prefix, so the highest-volume path in the system could
     # never get a prompt-cache hit. As a tool the assistant looks the time up
-    # when the answer depends on it, and the prompt is static.
-    "assistant": ["search_blog_posts", "search_projects", "user_info", "current_time"],
+    # when the answer depends on it, and the prompt is static. The public
+    # library tool adds only administrator-approved references, never private uploads.
+    "assistant": ["search_blog_posts", "search_projects", "user_info", "current_time", "search_public_library"],
 
     # Listed explicitly even when empty, so a gap is visible rather than
     # looking like an oversight.
     "trend_intelligence": [],
     "trend_prediction": [],
-    "research": ["search_knowledge", "fetch_url"],
-    "fact_verifier": ["search_knowledge", "fetch_url"],
-    "writer": ["search_knowledge"],
+    "research": ["search_knowledge", "fetch_url", "search_public_library"],
+    "fact_verifier": ["search_knowledge", "fetch_url", "search_public_library"],
+    "writer": ["search_knowledge", "search_public_library"],
     "social": [],
 
     # Not an agent that dispatches: the newsroom runs its subagents, each of
@@ -180,6 +181,10 @@ def register_builtin_tools(target=registry):
         search_knowledge,
         search_projects,
     )
+
+    if 'search_public_library' not in target:
+        from knowledge_base.library.tools import search_public_library
+        target.register('search_public_library', search_public_library)
 
     if "search_blog_posts" not in target:
         target.register("search_blog_posts", search_blog_posts)
