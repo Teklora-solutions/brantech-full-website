@@ -36,12 +36,12 @@ Complete the approved document-library specification in this checkout. No EduSha
 - Operator follow-up verification after removing the toggle: **921 affected-app tests passed** again on isolated PostgreSQL/pgvector with the temporary fast test hasher and stub providers. Availability/navigation regression now runs without any feature-setting override; public AI suite expectations include the always-registered public-library tool.
 - Applied all migrations on the disposable database, rolled knowledge_base back to `0004`, and reapplied `0005`/`0006`: passed. `makemigrations --check --dry-run`: no changes. `manage.py check`: no issues.
 - `git diff --check`, `bash -n entrypoint.sh`, and `docker compose config --no-env-resolution --quiet`: passed. Compose interpolation warns if deployment database variables are absent; no real services were launched by this config check.
-- Local host lacks Tesseract/browser automation: actual OCR binary execution and mobile/desktop/keyboard browser acceptance are **not claimed**. Parser/DOCX/PDF/scan paths and the worker/HTTP workflows are covered with generated documents and stub OCR/embedding dependencies.
+- Initial delivery did not claim actual OCR binary execution or browser acceptance. The subsequent [UI redesign](2026-11-12-library-ui-redesign-plan.md) located cached Playwright/Chromium and completed local desktop/mobile/light/dark and keyboard/browser-flow checks. Tesseract execution remains unverified; parser/DOCX/PDF/scan paths and worker/HTTP workflows use generated documents and stub OCR/embedding dependencies.
 
 ### Outstanding release gates (not implementation/task-board completion)
 
 - Build/run the updated Docker image and dedicated worker with Tesseract/Poppler, then smoke-test real PDF scans and PNG/JPEG OCR; confirm queue timeout/memory limits in the deployment.
-- Mobile/desktop/keyboard browser acceptance of upload, shared access and both administrator review queues.
+- Local mobile/desktop/keyboard browser acceptance of upload, sharing and public review is now covered by the UI redesign execution record; repeat the smoke checks against the deployment configuration.
 - Verify shared private storage/permissions, real provider approval/credentials/space, backup retention/expiry and restore/redeletion procedure.
 - Obtain security/operational acceptance as part of deployment. No library feature toggle exists. No production migrations/deployment, real-document provider calls or live task-board approvals have been performed.
 

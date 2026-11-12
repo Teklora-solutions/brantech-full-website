@@ -9,6 +9,9 @@ class MetadataForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['title'].widget.attrs['placeholder'] = 'e.g. Product strategy · Q4 research'
+        self.fields['description'].widget.attrs['placeholder'] = 'A short summary to help your team find and understand this document…'
+        self.fields['tags'].widget.attrs['placeholder'] = 'e.g. research, strategy, meeting notes'
         if self.instance and self.instance.pk:
             self.initial['tags'] = ', '.join(self.instance.tags)
 
@@ -25,19 +28,25 @@ class MetadataForm(forms.ModelForm):
 
 
 class UploadForm(MetadataForm):
-    original = forms.FileField(help_text='PDF, DOCX, TXT, Markdown, PNG, JPEG. Maximum 25 MB.')
+    original = forms.FileField(
+        label='Document', help_text='PDF, DOCX, TXT, Markdown, PNG, JPEG. Maximum 25 MB.',
+        widget=forms.ClearableFileInput(attrs={'accept': '.pdf,.docx,.txt,.md,.png,.jpg,.jpeg'}),
+    )
     authority = forms.BooleanField(label='I have authority to upload this document and request its processing.')
 
 
 class ReplacementForm(forms.Form):
-    original = forms.FileField()
+    original = forms.FileField(
+        label='Replacement document',
+        widget=forms.ClearableFileInput(attrs={'accept': '.pdf,.docx,.txt,.md,.png,.jpg,.jpeg'}),
+    )
     authority = forms.BooleanField(label='I have authority to upload and process this replacement.')
 
 
 class SharingForm(forms.Form):
     visibility = forms.ChoiceField(choices=LibraryDocument._meta.get_field('visibility').choices)
-    user = forms.ModelChoiceField(queryset=get_user_model().objects.none(), required=False)
-    group = forms.ModelChoiceField(queryset=Group.objects.none(), required=False)
+    user = forms.ModelChoiceField(label='Person', queryset=get_user_model().objects.none(), required=False, empty_label='Select a person (optional)')
+    group = forms.ModelChoiceField(queryset=Group.objects.none(), required=False, empty_label='Select a group (optional)', help_text='Choose one person or one group per grant, or leave both empty to update visibility only.')
     access_level = forms.ChoiceField(choices=[('read', 'Read'), ('edit', 'Edit')])
 
     def __init__(self, *args, **kwargs):
@@ -54,11 +63,19 @@ class SharingForm(forms.Form):
 
 class ClearanceForm(forms.Form):
     classification = forms.ChoiceField(choices=[('internal_standard', 'Standard internal data — Gemini permitted'), ('restricted_pii', 'Restricted personal/financial data — processing blocked')])
-    reason = forms.CharField(max_length=1000, help_text='Record the review rationale, not document bodies or personal data.')
+    reason = forms.CharField(
+        label='Review rationale', max_length=1000,
+        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'Summarise your clearance decision without including private document text…'}),
+        help_text='Record the review rationale, not document bodies or personal data.',
+    )
 
 
 class ReviewForm(forms.Form):
-    reason = forms.CharField(max_length=1000, help_text='Confirm privacy, confidentiality, licensing and redaction review. Do not include document text.')
+    reason = forms.CharField(
+        label='Public-use review notes', max_length=1000,
+        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'Record the privacy, confidentiality and rights checks behind your decision…'}),
+        help_text='Confirm privacy, confidentiality, licensing and redaction review. Do not include document text.',
+    )
 
 
 class GrantRemovalForm(forms.Form):

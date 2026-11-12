@@ -548,7 +548,13 @@
 
             // Path-based sidebar link highlighting for other pages
             const path = window.location.pathname;
-            if (path.startsWith('/appointments/')) {
+            if (path.startsWith('/library/')) {
+                const link = document.getElementById('nav-library');
+                if (link) {
+                    link.classList.add('active');
+                    link.setAttribute('aria-current', 'page');
+                }
+            } else if (path.startsWith('/appointments/')) {
                 const link = document.getElementById('nav-appointments');
                 if (link) link.classList.add('active');
             } else if (path.startsWith('/editorial/dashboard/')) {

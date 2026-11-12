@@ -408,6 +408,83 @@ class LibraryWorkflowTests(TestCase):
         self.assertFalse(orphan.exists())
         self.assertTrue(Path(self.version.original.path).exists())
 
+    def test_empty_library_has_actionable_state_without_fake_pagination(self):
+        LibraryDocument.objects.filter(pk=self.document.pk).update(is_deleted=True)
+        response = self.client.get('/library/')
+        self.assertContains(response, "Build your team's knowledge library")
+        self.assertContains(response, 'Upload your first document')
+        self.assertNotContains(response, 'Page 1 of 1')
+        self.assertNotContains(response, 'Processing clearance</a>')
+        self.assertEqual(response.context['overview']['total'], 0)
+
+    def test_library_summaries_and_status_filters_are_permission_scoped(self):
+        upload_document(self.other, SimpleUploadedFile('private.txt', b'Private other data'), title='Other secret title', authority=True)
+        response = self.client.get('/library/?status=ready')
+        self.assertContains(response, 'No matching documents')
+        self.assertEqual(response.context['overview']['total'], 1)
+        self.assertEqual(response.context['overview']['awaiting'], 1)
+        self.assertNotContains(response, 'Other secret title')
+        self.assertEqual(response.context['page_obj'].paginator.count, 0)
+        response = self.client.get('/library/?status=awaiting_clearance')
+        self.assertContains(response, self.document.title)
+        self.assertContains(response, 'Awaiting clearance')
+        response = self.client.get('/library/?status=forged-state')
+        self.assertEqual(response.context['selected_status'], '')
+        self.assertEqual(response.context['page_obj'].paginator.count, 1)
+
+    def test_no_results_and_review_empty_states_are_distinct(self):
+        response = self.client.get('/library/?q=unfindable')
+        self.assertContains(response, 'No matching documents')
+        self.assertContains(response, 'Clear filters')
+        self.assertNotContains(response, 'Upload your first document')
+        self.client.force_login(self.admin)
+        response = self.client.get('/library/review/?queue=public')
+        self.assertContains(response, "You're all caught up")
+        self.assertContains(response, 'No documents are waiting for public approval')
+        self.assertEqual(response.context['library_section'], 'public')
+
+    def test_upload_and_detail_have_distinct_accessible_field_ids(self):
+        from html.parser import HTMLParser
+        class IdParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.ids = []
+            def handle_starttag(self, tag, attrs):
+                for key, value in attrs:
+                    if key == 'id':
+                        self.ids.append(value)
+        self.client.force_login(self.admin)
+        for path in ['/library/upload/', f'/library/{self.document.pk}/']:
+            response = self.client.get(path)
+            parser = IdParser()
+            parser.feed(response.content.decode())
+            self.assertEqual(len(parser.ids), len(set(parser.ids)), path)
+            self.assertContains(response, 'knowledge_base/library.css')
+        response = self.client.get(f'/library/{self.document.pk}/')
+        self.assertContains(response, 'clearance_reason')
+        self.assertContains(response, 'review_reason')
+        self.assertContains(response, 'Waiting for processing clearance')
+
+    def test_summary_counts_do_not_duplicate_multiple_grants(self):
+        self.other.groups.add(self.group)
+        LibraryGrant.objects.create(document=self.document, user=self.other)
+        LibraryGrant.objects.create(document=self.document, group=self.group)
+        self.client.force_login(self.other)
+        response = self.client.get('/library/')
+        self.assertEqual(response.context['overview']['total'], 1)
+        self.assertEqual(response.context['page_obj'].paginator.count, 1)
+        self.assertNotContains(response, 'href="/library/review/')
+
+    def test_pagination_only_appears_when_needed_and_preserves_filters(self):
+        for _ in range(20):
+            self.upload()
+        response = self.client.get('/library/?q=architecture&status=awaiting_clearance')
+        self.assertContains(response, 'Page 1 of 2')
+        self.assertContains(response, 'page=2&amp;q=architecture&amp;status=awaiting_clearance')
+        response = self.client.get('/library/?q=architecture&status=awaiting_clearance&page=2')
+        self.assertContains(response, 'Page 2 of 2')
+        self.assertEqual(len(response.context['page_obj']), 1)
+
     def test_chunk_limit_and_local_ocr(self):
         with self.assertRaises(ValueError):
             chunk_sections([('Page 1', 'x' * 1000000)])
