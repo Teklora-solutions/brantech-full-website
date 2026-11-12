@@ -1,0 +1,9 @@
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="kb-pagination" aria-label="Document pages">
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    <div class="kb-actions">
+        {% if page_obj.has_previous %}<a class="kb-btn kb-btn-small" href="?page={{ page_obj.previous_page_number }}&amp;q={{ query|urlencode }}&amp;status={{ selected_status|urlencode }}{% if queue %}&amp;queue={{ queue }}{% endif %}"><i class="fas fa-arrow-left" aria-hidden="true"></i>Previous</a>{% endif %}
+        {% if page_obj.has_next %}<a class="kb-btn kb-btn-small" href="?page={{ page_obj.next_page_number }}&amp;q={{ query|urlencode }}&amp;status={{ selected_status|urlencode }}{% if queue %}&amp;queue={{ queue }}{% endif %}">Next<i class="fas fa-arrow-right" aria-hidden="true"></i></a>{% endif %}
+    </div>
+</nav>
+{% endif %}

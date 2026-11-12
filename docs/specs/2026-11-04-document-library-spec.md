@@ -87,6 +87,8 @@ Alternatives rejected: a single `is_public` flag cannot express review/version h
 
 ## UI acceptance
 
+The [2026-11-12 UI redesign](2026-11-12-library-ui-redesign-spec.md) replaces the original scaffold with shared-theme components, permission-scoped summaries, filterable document rows, role-aware tabs and distinct empty states. Uploads retain native form behavior with progressive drag-and-drop/progress/error handling; detail screens separate preview, facts, sharing, editing and independent administrator decisions. Browser verification is recorded in the [redesign execution plan](../plans/2026-11-12-library-ui-redesign-plan.md).
+
 Library list/search, upload, details/preview/download, share editor, external-processing clearance queue and separate public-review queue use existing Django templates and panel conventions. Display independent processing and approval badges, owner/category, access summary, and accessible error/empty/loading states. Unauthorised users must not learn titles/counts via search or badges. Public approval need not expose an anonymous original-file URL; v1 public use is approved AI retrieval with safe citation metadata.
 
 ## Verification and release gates

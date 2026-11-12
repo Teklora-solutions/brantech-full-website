@@ -103,7 +103,8 @@ Implementation gates below are tracked in the manually issued task packets and l
 - [x] Build library browse/upload/detail UI, sharing controls, processing indicators, and administrator review queue (Tasks #35 & #40 scope; `/library/`, linked from the panel).
 - [x] Exercise automated access-control, public-revocation, upload/download, worker-race and lifecycle regression gates using isolated PostgreSQL/pgvector and fake providers.
 - [x] Remove the library feature toggle entirely; staff navigation, pages, processing and public-approved retrieval are always available subject to existing authorization and review policies.
-- [ ] Complete real-worker OCR, mobile/desktop/keyboard browser acceptance, production storage/backup-retention verification and security/operational sign-off. No live task statuses changed. See [completion plan](plans/2026-11-12-library-completion-plan.md).
+- [x] Redesign the complete library UI to match the admin theme: responsive browsing/review queues, upload/progress/errors, document preview/details/sharing and administrator decisions; verify desktop/mobile/light/dark and keyboard flows in a real local browser ([spec](specs/2026-11-12-library-ui-redesign-spec.md), [execution](plans/2026-11-12-library-ui-redesign-plan.md)).
+- [ ] Complete real-worker OCR, production storage/backup-retention verification and security/operational sign-off. No live task statuses changed. See [completion plan](plans/2026-11-12-library-completion-plan.md).
 
 ---
 

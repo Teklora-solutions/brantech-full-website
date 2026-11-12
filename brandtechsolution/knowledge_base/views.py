@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import never_cache
@@ -16,6 +16,39 @@ from .library.access import visible_documents
 from .library.contracts import LibraryAction
 from .library.policy import LibraryPolicy
 from .library.services import audit, authorize, mutate, upload_document
+
+
+STATUS_OPTIONS = [
+    ('awaiting_clearance', 'Awaiting clearance'), ('queued', 'Queued'),
+    ('processing', 'Processing'), ('ready', 'Ready'), ('failed', 'Failed'), ('blocked', 'Blocked'),
+]
+
+
+def _library_context(actor, section):
+    """All displayed counts come from the same actor-filtered ACL queryset."""
+    overview = visible_documents(actor).aggregate(
+        total=Count('pk', distinct=True),
+        ready=Count('pk', filter=Q(current_version__processing_state='ready'), distinct=True),
+        awaiting=Count('pk', filter=Q(current_version__clearance_state='pending'), distinct=True),
+        public_pending=Count('pk', filter=Q(current_version__public_approval_state='pending'), distinct=True),
+    )
+    return {'overview': overview, 'library_section': section,
+            'is_library_admin': LibraryPolicy.is_administrator(actor)}
+
+
+def _filter_documents(request, rows):
+    query = request.GET.get('q', '').strip()[:200]
+    status = request.GET.get('status', '')
+    if status not in dict(STATUS_OPTIONS):
+        status = ''
+    if query:
+        # Metadata and current ready text only; ACL is already constrained.
+        rows = rows.filter(Q(title__icontains=query) | Q(description__icontains=query) | Q(
+            current_version__processing_state='ready', current_version__chunks__text__icontains=query,
+        )).distinct()
+    if status:
+        rows = rows.filter(current_version__processing_state=status)
+    return rows, {'query': query, 'selected_status': status, 'status_options': STATUS_OPTIONS}
 
 
 def library_view(view):
@@ -35,20 +68,14 @@ def library_view(view):
 @library_view
 @require_GET
 def index(request):
-    query = request.GET.get('q', '').strip()[:200]
     rows = visible_documents(request.user).select_related('owner', 'current_version')
-    if query:
-        # Metadata and current ready text only; ACL is already constrained.
-        rows = rows.filter(Q(title__icontains=query) | Q(description__icontains=query) | Q(
-            current_version__processing_state='ready', current_version__chunks__text__icontains=query,
-        )).distinct()
+    rows, filters = _filter_documents(request, rows)
     page = Paginator(rows, 20).get_page(request.GET.get('page'))
     if LibraryPolicy.is_administrator(request.user):
         for document in page:
             audit(document, request.user, 'admin_list', document.current_version)
     return render(request, 'knowledge_base/index.html', {
-        'page_obj': page, 'query': query,
-        'is_library_admin': LibraryPolicy.is_administrator(request.user),
+        'page_obj': page, **filters, **_library_context(request.user, 'documents'),
     })
 
 
@@ -65,7 +92,9 @@ def upload(request):
             return redirect('library:detail', pk=document.pk)
         except ValidationError as exc:
             form.add_error(None, exc)
-    return render(request, 'knowledge_base/upload.html', {'form': form})
+    return render(request, 'knowledge_base/upload.html', {
+        'form': form, **_library_context(request.user, 'upload'),
+    })
 
 
 @library_view
@@ -78,11 +107,12 @@ def detail(request, pk):
     return render(request, 'knowledge_base/detail.html', {
         'document': document, 'version': document.current_version,
         'can_edit': allowed(LibraryAction.EDIT), 'can_share': allowed(LibraryAction.SHARE),
-        'is_library_admin': LibraryPolicy.is_administrator(request.user),
-        'metadata_form': forms.MetadataForm(instance=document),
-        'replacement_form': forms.ReplacementForm(),
-        'sharing_form': forms.SharingForm(initial={'visibility': document.visibility}),
-        'clearance_form': forms.ClearanceForm(), 'review_form': forms.ReviewForm(),
+        **_library_context(request.user, 'documents'),
+        'metadata_form': forms.MetadataForm(instance=document, auto_id='metadata_%s'),
+        'replacement_form': forms.ReplacementForm(auto_id='replacement_%s'),
+        'sharing_form': forms.SharingForm(initial={'visibility': document.visibility}, auto_id='sharing_%s'),
+        'clearance_form': forms.ClearanceForm(auto_id='clearance_%s'),
+        'review_form': forms.ReviewForm(auto_id='review_%s'),
         'chunks': document.current_version.chunks.all() if document.current_version and document.current_version.processing_state == 'ready' else [],
         'grants': document.grants.select_related('user', 'group') if allowed(LibraryAction.SHARE) else [],
         'events': document.audit_events.select_related('actor').order_by('-created_at')[:30] if allowed(LibraryAction.SHARE) else [],
@@ -119,9 +149,10 @@ def review_queue(request):
     else:
         queue = 'clearance'
         rows = rows.filter(current_version__clearance_state='pending')
+    rows, filters = _filter_documents(request, rows)
     return render(request, 'knowledge_base/index.html', {
         'page_obj': Paginator(rows, 20).get_page(request.GET.get('page')),
-        'queue': queue, 'is_library_admin': True,
+        'queue': queue, **filters, **_library_context(request.user, queue),
     })
 
 

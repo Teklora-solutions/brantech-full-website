@@ -1,29 +1,26 @@
 {% extends 'brand/admin_base.html' %}
+{% load static %}
 {% block title %}Knowledge Library · Teklora{% endblock %}
 {% block extra_head %}
-<style>
-.library { max-width: 1100px; margin: auto; padding: 24px; color: #e5e7eb; }
-.library h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem; }
-.library h2 { font-size: 1.2rem; font-weight: 600; margin-bottom: .75rem; }
-.library nav, .library .actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
-.library a { color: #93c5fd; text-decoration: underline; }
-.library .card { border: 1px solid #374151; border-radius: 12px; padding: 20px; margin: 16px 0; background: #111827; }
-.library label { display: block; margin: 12px 0 6px; }
-.library input:not([type=hidden]), .library textarea, .library select { max-width: 100%; padding: 9px; border: 1px solid #6b7280; border-radius: 6px; background: #1f2937; color: #f9fafb; }
-.library input[type=text], .library textarea, .library select { width: 100%; }
-.library button { background: #1d4ed8; border-radius: 6px; padding: 10px 16px; margin-top: 12px; color: white; }
-.library button.danger { background: #991b1b; }
-.library .muted, .library .helptext { color: #cbd5e1; font-size: .875rem; }
-.library .badge { display: inline-block; padding: 4px 8px; background: #1f2937; border-radius: 6px; margin: 4px; }
-.library pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; }
-.library .errorlist { color: #fda4af; }
-.library :focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
-</style>
+<link rel="stylesheet" href="{% static 'knowledge_base/library.css' %}?v=2">
 {% endblock %}
 {% block content %}
-<section class="library" aria-label="Knowledge library">
-<nav aria-label="Library navigation"><a href="{% url 'library:index' %}">Knowledge library</a><a href="{% url 'library:upload' %}">Upload document</a>{% if is_library_admin %}<a href="{% url 'library:review' %}">Processing clearance queue</a><a href="{% url 'library:review' %}?queue=public">Public review queue</a>{% endif %}</nav>
-{% for message in messages %}<p class="card" role="status">{{ message }}</p>{% endfor %}
-{% block library_content %}{% endblock %}
-</section>
+<div class="kb">
+    <div class="kb-eyebrow"><a href="/admin-panel/">Workspace</a><i class="fas fa-chevron-right" aria-hidden="true"></i><a href="{% url 'library:index' %}">Knowledge library</a>{% block library_breadcrumb %}{% endblock %}</div>
+    {% for message in messages %}
+    <div class="kb-alert {{ message.tags }}" role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}"><i class="fas fa-circle-info" aria-hidden="true"></i><span>{{ message }}</span></div>
+    {% endfor %}
+    {% block library_header %}{% endblock %}
+    <nav class="kb-tabs" aria-label="Library navigation">
+        <a class="kb-tab" href="{% url 'library:index' %}" {% if library_section == 'documents' %}aria-current="page"{% endif %}><i class="fas fa-folder-open" aria-hidden="true"></i>Documents{% if overview %}<span class="kb-count">{{ overview.total }}</span>{% endif %}</a>
+        {% if is_library_admin %}
+        <a class="kb-tab" href="{% url 'library:review' %}" {% if library_section == 'clearance' %}aria-current="page"{% endif %}><i class="fas fa-shield-halved" aria-hidden="true"></i>Processing clearance{% if overview %}<span class="kb-count">{{ overview.awaiting }}</span>{% endif %}</a>
+        <a class="kb-tab" href="{% url 'library:review' %}?queue=public" {% if library_section == 'public' %}aria-current="page"{% endif %}><i class="fas fa-globe" aria-hidden="true"></i>Public review{% if overview %}<span class="kb-count">{{ overview.public_pending }}</span>{% endif %}</a>
+        {% endif %}
+    </nav>
+    {% block library_content %}{% endblock %}
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="{% static 'knowledge_base/library.js' %}?v=2" defer></script>
 {% endblock %}

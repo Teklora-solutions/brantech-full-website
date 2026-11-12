@@ -1,15 +1,50 @@
 {% extends 'knowledge_base/base.html' %}
+{% load library_ui %}
+{% block library_header %}
+<header class="kb-header">
+    <div class="kb-header-copy">
+        <div class="kb-heading-line"><span class="kb-heading-icon"><i class="fas {% if queue == 'public' %}fa-globe{% elif queue %}fa-shield-halved{% else %}fa-book-open{% endif %}" aria-hidden="true"></i></span><h1>{% if queue == 'public' %}Public review{% elif queue %}Processing clearance{% else %}Knowledge library{% endif %}</h1></div>
+        <p>{% if queue == 'public' %}Review ready references before making them available to public AI. Processing clearance alone is not publication approval.{% elif queue %}Review uploads before external processing. Originals stay private, and restricted data remains blocked.{% else %}Your team's documents, references, and shared knowledge. Private by default. Ready when you need them.{% endif %}</p>
+    </div>
+    <div class="kb-actions"><a class="kb-btn kb-btn-primary" href="{% url 'library:upload' %}"><i class="fas fa-plus" aria-hidden="true"></i>Upload document</a></div>
+</header>
+{% endblock %}
 {% block library_content %}
-<h1>{% if queue == 'public' %}Public publication review{% elif queue %}External-processing clearance{% else %}Knowledge library{% endif %}</h1>
-<p class="muted">Private documents, shared knowledge, and administrator-reviewed AI references. Uploads remain private unless explicitly shared.</p>
-{% if not queue %}<form method="get" role="search"><label for="library-query">Search permitted documents and extracted text</label><input id="library-query" name="q" value="{{ query }}" maxlength="200"><button>Search</button></form>{% endif %}
-{% for document in page_obj %}
-<article class="card">
-<h2><a href="{% url 'library:detail' document.pk %}">{{ document.title }}</a></h2>
-<p>{{ document.description|truncatechars:220 }}</p>
-<p class="muted">{{ document.category }} · {{ document.owner.username }} · {{ document.get_visibility_display }}</p>
-{% with version=document.current_version %}<span class="badge">Processing: {{ version.processing_state }}</span><span class="badge">Clearance: {{ version.clearance_state }}</span><span class="badge">Public use: {{ version.public_approval_state }}</span>{% endwith %}
-</article>
-{% empty %}<p class="card">No documents available here. Upload a document or ask its owner to share access.</p>{% endfor %}
-<nav aria-label="Pagination">{% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}&amp;q={{ query|urlencode }}&amp;queue={{ queue|urlencode }}">Previous</a>{% endif %}<span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}&amp;q={{ query|urlencode }}&amp;queue={{ queue|urlencode }}">Next</a>{% endif %}</nav>
+{% if not queue %}
+<section class="kb-summary" aria-label="Your accessible library at a glance">
+    <div class="kb-stat"><div><span class="kb-stat-label">Accessible documents</span><strong>{{ overview.total }}</strong></div><span class="kb-stat-icon"><i class="fas fa-layer-group" aria-hidden="true"></i></span></div>
+    <div class="kb-stat"><div><span class="kb-stat-label">Ready to reference</span><strong>{{ overview.ready }}</strong></div><span class="kb-stat-icon is-ready"><i class="fas fa-circle-check" aria-hidden="true"></i></span></div>
+    <div class="kb-stat"><div><span class="kb-stat-label">Awaiting clearance</span><strong>{{ overview.awaiting }}</strong></div><span class="kb-stat-icon is-pending"><i class="fas fa-clock" aria-hidden="true"></i></span></div>
+</section>
+{% endif %}
+<section class="kb-panel" aria-label="{% if queue %}Documents awaiting review{% else %}Document collection{% endif %}">
+    <div class="kb-panel-header"><div><h2>{% if queue %}Awaiting your review{% else %}All documents{% endif %}</h2><p>{{ page_obj.paginator.count }} document{{ page_obj.paginator.count|pluralize }}{% if query or selected_status %} matching your filters{% elif queue %} in this queue{% else %} available to you{% endif %}</p></div><span class="kb-badge"><i class="fas fa-lock" aria-hidden="true"></i>Permission-aware</span></div>
+    <form class="kb-toolbar" method="get" role="search">
+        {% if queue %}<input type="hidden" name="queue" value="{{ queue }}">{% endif %}
+        <div class="kb-search"><label for="library-query">Search documents</label><div class="kb-input-wrap"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><input id="library-query" name="q" value="{{ query }}" maxlength="200" placeholder="Search titles, descriptions, or extracted text…" type="search"></div></div>
+        <div class="kb-filter"><label for="library-status">Processing status</label><select name="status" id="library-status"><option value="">All statuses</option>{% for value, label in status_options %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <button class="kb-btn" type="submit">Search<i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+        {% if query or selected_status %}<a class="kb-btn kb-btn-quiet" href="{% if queue %}{% url 'library:review' %}?queue={{ queue }}{% else %}{% url 'library:index' %}{% endif %}">Reset</a>{% endif %}
+    </form>
+    {% if page_obj %}
+    <div class="kb-list-heading" aria-hidden="true"><span>Document</span><span>Processing</span><span>Public use</span><span></span></div>
+    {% for document in page_obj %}{% with version=document.current_version %}
+    <article class="kb-document">
+        <div class="kb-document-main"><span class="kb-file-icon"><i class="fas {{ version.detected_format|library_icon }}" aria-hidden="true"></i></span><div><a class="kb-document-title" href="{% url 'library:detail' document.pk %}{% if queue == 'public' %}#public-review{% elif queue %}#processing-review{% endif %}">{{ document.title }}</a>{% if document.description %}<p class="kb-document-description">{{ document.description|truncatechars:100 }}</p>{% endif %}<p class="kb-document-meta"><span>{{ version.detected_format|upper }} · {{ version.size_bytes|filesizeformat }}</span><span>{{ document.owner.get_full_name|default:document.owner.username }}</span><span>{{ document.updated_at|date:'M j, Y' }}</span><span><i class="fas {% if document.visibility == 'organisation' %}fa-users{% else %}fa-lock{% endif %}" aria-hidden="true"></i> {{ document.get_visibility_display }}</span></p></div></div>
+        <div class="kb-document-status"><span class="kb-badge" data-state="{{ version.processing_state }}">{{ version.processing_state|library_state }}</span><span class="kb-status-note">Clearance: {{ version.clearance_state|library_state }}</span></div>
+        <div class="kb-document-status is-public"><span class="kb-badge" data-state="{{ version.public_approval_state }}">{% if version.public_approval_state == 'approved' %}Public-approved{% else %}{{ version.public_approval_state|library_state }}{% endif %}</span></div>
+        <a class="kb-btn kb-btn-small kb-btn-quiet kb-row-action" href="{% url 'library:detail' document.pk %}{% if queue == 'public' %}#public-review{% elif queue %}#processing-review{% endif %}" aria-label="{% if queue %}Review{% else %}Open{% endif %} {{ document.title }}"><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+    </article>
+    {% endwith %}{% endfor %}
+    {% else %}
+    <div class="kb-empty">
+        <div class="kb-empty-art"><i class="fas {% if query or selected_status %}fa-magnifying-glass{% elif queue %}fa-check-double{% else %}fa-folder-plus{% endif %}" aria-hidden="true"></i></div>
+        <h2>{% if query or selected_status %}No matching documents{% elif queue %}You're all caught up{% else %}Build your team's knowledge library{% endif %}</h2>
+        <p>{% if query or selected_status %}Try a different search or clear your filters. You'll only see documents you have permission to access.{% elif queue == 'public' %}No documents are waiting for public approval. New requests will appear here when they're ready for review.{% elif queue %}No uploads are waiting for processing clearance. New documents will appear here for administrator review.{% else %}Give useful references a home. Upload your first report, research paper, or meeting notes, then share them with the right people.{% endif %}</p>
+        <div class="kb-actions">{% if query or selected_status %}<a class="kb-btn" href="{% if queue %}{% url 'library:review' %}?queue={{ queue }}{% else %}{% url 'library:index' %}{% endif %}">Clear filters</a>{% elif queue %}<a class="kb-btn" href="{% url 'library:index' %}">Browse documents<i class="fas fa-arrow-right" aria-hidden="true"></i></a>{% else %}<a class="kb-btn kb-btn-primary" href="{% url 'library:upload' %}"><i class="fas fa-plus" aria-hidden="true"></i>Upload your first document</a>{% endif %}</div>
+    </div>
+    {% endif %}
+    {% include 'knowledge_base/_pagination.html' %}
+</section>
+<p class="kb-footer-note"><i class="fas fa-shield-halved" aria-hidden="true"></i><span>Your library stays private. Sharing, external processing, and public use are separate permissions.</span></p>
 {% endblock %}

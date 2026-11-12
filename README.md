@@ -15,6 +15,8 @@ The staff document library supports private research/meeting documents, per-docu
 
 **Implementation (Tasks #33–#35 and #40):** Staff pages at `/library/` now provide private upload, permission-filtered search, extracted previews, authenticated downloads, replacement versions, per-person/group/organisation sharing, processing clearance and a separate public-review queue. The panel sidebar always links to **Knowledge Library** for staff. Documents are private by default; only active superusers or active staff in `Administrator` with `approve_library_publication` may approve processing/public use. Metadata edits, replacements, revocation and deletion immediately remove public eligibility.
 
+The library UI uses the admin's shared light/dark theme: permission-scoped summary cards, searchable/filterable document rows, dedicated review tabs, and distinct empty/search/queue states. Uploads provide a native keyboard-accessible file chooser with optional drag-and-drop, file feedback and real upload progress; success is shown only after server confirmation. Document pages separate preview, file facts, sharing, editing and administrator decisions into focused panels. See the [UI redesign specification](docs/specs/2026-11-12-library-ui-redesign-spec.md).
+
 ### Library configuration and operations
 
 - The library is always available to authenticated active staff; there is no feature toggle or enablement environment variable. Document ACLs, administrator processing clearance and separate public-use approval remain mandatory.
