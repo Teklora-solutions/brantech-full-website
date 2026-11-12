@@ -108,6 +108,19 @@ Implementation gates below are tracked in the manually issued task packets and l
 
 ---
 
+### 📎 Milestone 7: Task Deliverables & Knowledge Library Integration *(Planned; not implemented)*
+
+Implementation plan: [Task document deliverables](plans/2026-11-12-task-document-deliverables-plan.md). Planning only; no live task assignments or status changes.
+
+- [x] Record the implementation plan for document-backed task submissions alongside existing code delivery, without a separate specification.
+- [ ] Add assignment-specific submission rounds, exact document-version attachments and retained review history, with compatible task delivery requirements.
+- [ ] Implement explicit version-scoped reviewer access, private downloads and deletion/revocation safeguards without changing processing or publication approvals.
+- [ ] Integrate submission, targeted revision requests and acceptance with shared completion guards across API, MCP and GitHub/roadmap automation.
+- [ ] Build responsive staff submission and manager review UI in Tasks, including upload/library selection and revision history.
+- [ ] Verify ACLs, multi-assignee lifecycle, existing developer workflows and real-browser acceptance before controlled release.
+
+---
+
 ## ✅ Completed Milestones
 
 - [x] **Statutory Compliance & Legal Engine**: KDPA 2019 & GDPR compliant Privacy Policy and Terms of Service.
