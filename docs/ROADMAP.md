@@ -48,6 +48,7 @@ This document serves as the high-level roadmap and strategic milestone tracker f
     - [x] Teklora Admin Developer & Agents workspace (`/admin-panel/?section=developer`) with 1-click agent setup link.
     - [x] Agent setup instruction endpoint (`/developer/setup/`) serving tailored markdown setup instructions for autonomous agents.
     - [x] Zero-dependency Teklora Developer MCP Server (`brandtechsolution/scripts/teklora_mcp.py`) exposing task management, profile, repos, and knowledge base search.
+    - [x] Bounded MCP TCP address fallback for broken IPv6 connectivity, preserving IPv4 fallback and TLS verification with transport regression coverage.
     - [x] Teklora Developer Skill (`skills/teklora-developer/SKILL.md`) codifying architecture standards, task ladder, git conventions, and file maintenance contract.
   - [ ] Staff GitHub repository discovery: scan and import accessible repositories from configured staff GitHub profiles.
   - [ ] Automated PR status linking with Teklora Admin Tasks.

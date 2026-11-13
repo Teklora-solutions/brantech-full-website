@@ -8,9 +8,12 @@ Communicates via JSON-RPC 2.0 over standard input/output (stdio).
 """
 
 import argparse
+import http.client
 import json
 import os
+import socket
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -21,12 +24,63 @@ SERVER_VERSION = "1.0.0"
 PROTOCOL_VERSION = "2024-11-05"
 
 
+def _connect_with_fallback(address, timeout=30, source_address=None):
+    """Bound TCP attempts so unreachable IPv6 cannot starve working IPv4.
+
+    Keep normal resolver order and HTTP I/O timeouts. This factory is local
+    to our urllib handlers; it does not change global socket behavior.
+    """
+    host, port = address
+    addresses = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+    deadline = time.monotonic() + 10
+    last_error = OSError("No TCP addresses returned by resolver")
+    for family, socktype, proto, _, sockaddr in addresses:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("TCP connection budget exhausted") from last_error
+        sock = socket.socket(family, socktype, proto)
+        try:
+            sock.settimeout(min(timeout, 3, remaining))
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(sockaddr)
+            sock.settimeout(timeout)
+            return sock
+        except OSError as exc:
+            last_error = exc
+            sock.close()
+    raise last_error
+
+
+class _HTTPConnection(http.client.HTTPConnection):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._create_connection = _connect_with_fallback
+
+
+class _HTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._create_connection = _connect_with_fallback
+
+
+class _HTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        return self.do_open(_HTTPConnection, req)
+
+
+class _HTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(_HTTPSConnection, req, context=self._context)
+
+
 class TekloraClient:
     """HTTP client communicating with Teklora Django APIs via API key."""
 
     def __init__(self, base_url: str, api_key: str):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key.strip()
+        self.opener = urllib.request.build_opener(_HTTPHandler(), _HTTPSHandler())
 
     def _request(self, method: str, path: str, data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         url = f"{self.base_url}{path}"
@@ -50,7 +104,7 @@ class TekloraClient:
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
 
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with self.opener.open(req, timeout=30) as resp:
                 resp_bytes = resp.read()
                 if not resp_bytes:
                     return {"ok": True}
@@ -64,6 +118,8 @@ class TekloraClient:
             raise RuntimeError(f"HTTP {exc.code} {exc.reason}: {parsed.get('detail') or parsed.get('error') or err_body}")
         except urllib.error.URLError as exc:
             raise RuntimeError(f"Network error connecting to {self.base_url}: {exc.reason}")
+        except TimeoutError as exc:
+            raise RuntimeError(f"Request to {self.base_url} timed out") from exc
 
 
 # ==============================================================================

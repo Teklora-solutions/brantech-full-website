@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Staff capability regression expectations**: Updated stale tests from sixteen capabilities/three groups to the already-migrated eighteen capabilities/four groups, including library publication approval and developer API keys.
+- **MCP dual-stack connection timeouts**: Bound TCP connection attempts per address and across fallback addresses in client-local HTTP/HTTPS handlers, allowing working IPv4 to be reached when IPv6 stalls. Preserve TLS verification and HTTP I/O timeouts, return explicit timeout errors, and add transport regression tests. Installed standalone MCP copies must be updated and reconnected.
 - **Task Modal Markdown Rendering**: Enabled markdown parsing via `marked.parse` for task descriptions and comments in the Teklora Admin panel modal (`brand/static/brand/js/admin/tasks.js`), styled with `.github-readme-body` for clean headings, lists, code blocks, and bold text.
 - **Administrator Role Key Generation Capability**: Added data migration `staff.0026_grant_generate_api_keys` to ensure members of the `Administrator` group automatically receive the `generate_api_keys` permission.
 - **GitHub Repository Polling 404 Logging**: In `tasks/github.py`, changed GitHub 404 repository not found errors (`UnknownObjectException`) from full stack trace errors (`logger.exception`) to clean warnings (`logger.warning`), avoiding worker error log noise when repositories are deleted or renamed on GitHub.
