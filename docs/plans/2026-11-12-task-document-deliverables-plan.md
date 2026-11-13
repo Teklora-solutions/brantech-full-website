@@ -1,8 +1,8 @@
 # Task Deliverables Backed by the Knowledge Library — Implementation Plan
 
-**Status:** Planning only; implementation not started.
+**Status:** Implemented and verified locally; controlled release pending. User authorized implementation after the source audit; no live task mutations or deployment authorized. API/data contract: `docs/specs/2026-11-12-task-document-deliverables-spec.md`. The original detailed checklist below remains the full design/release checklist; the implementation record at the end distinguishes verified delivery from deferred follow-ups.
 
-**Scope:** Let staff submit documents as task-assignment deliverables alongside the existing code workflow. This plan is the only new planning document; no separate specification is required for this request.
+**Scope:** Let staff submit documents as task-assignment deliverables alongside the existing code workflow. Originally planning-only; implementation now has a separate API/security specification as required by repository engineering policy.
 
 **Task allocation:** Not assigned. Do not invent task IDs, create live assignments, or change task-board statuses as part of writing this plan.
 
@@ -101,4 +101,27 @@ A non-technical assignee should be able to open their task, upload a report or c
 3. Task API/serializers and the complete staff/reviewer UI.
 4. Browser acceptance, compatibility regression, documentation and controlled release.
 
-Each increment must leave the existing task board and library usable. No task-board assignment, merge, push or deployment is authorized by this planning-only request.
+Each increment must leave the existing task board and library usable. No live task-board assignment/status mutation, merge, push or production deployment is authorized by this implementation request.
+
+## 5. Implementation and verification record
+
+### Delivered locally
+- Task delivery requirements default to Standard without converting existing tasks. Added immutable assignment submission rounds, exact nullable LibraryVersion attachments and append-only review events. Assignment/account/evidence removal does not cascade away submission history.
+- Separate private upload, paginated/searchable share-authorized library picker, explicit audience confirmation, multi-file submit (up to 10), idempotent retry UUIDs and stale-submission/current-version checks under task/document locks.
+- Current submitter and active manage_tasks reviewers receive submission-only original-file access. Other assignees/board readers receive no private notes, filenames/counts, feedback or downloads. No broad library grants, public retrieval, provider calls or approval changes are introduced.
+- Shared evidence guards cover API/API-key/MCP completion, task approval and the common GitHub/roadmap/documentation finishing service. New strict code requirements use attributed default-branch commits; legacy completion remains compatible. All current document rounds require acceptance before task approval.
+- Targeted changes requests reset only the relevant assignment. Whole-task reopen and self-undo retain past reviews and require new submission rounds. Deleted/purged/missing evidence blocks review/approval; ordinary replacement preserves pinned evidence.
+- Task modal includes upload/progress/error recovery, existing-library selection, notes, consent, immutable history, exact-version downloads, reviewer feedback/acceptance and task-level delivery requirement selection. Document-required tasks use explicit Submit work rather than a misleading bare completion button.
+
+### Verification
+- **964 tests pass** across tasks, knowledge_base, staff, ai_workflows and brand.test_admin_access, including 25 new submission tests (with PostgreSQL concurrent retry and multi-assignee completion coverage). Test-process-only MD5 password hashing accelerated the suite; application password configuration is unchanged. API-key tests verify the MCP endpoint's document guard.
+- An initial broad run had two runner-environment failures (explicit tracing=false contradicted a default-setting test, and sys.argv was populated after loading TESTING). Corrected the runner setup and reran all affected tests successfully; no application workaround was added.
+- Fresh isolated PostgreSQL database: migration apply → rollback to tasks.0005 → reapply passed. No production database or task records were changed.
+- Chromium against an isolated database/private storage: upload → submit → exact original download → changes request → existing-library selection → revision → acceptance → separate task approval passed. Legacy completion passed. Validation and a simulated upload network failure preserved the submission note/file selection; retry succeeded. Native keyboard focus order, unique modal control IDs and no horizontal mobile overflow were checked; desktop/mobile dark/light screenshots captured and inspected; no page JavaScript errors. Fixture login needed a normal CSRF-cookie issuance step because force_login bypasses the login form.
+- Browser artifacts: `/tmp/teklora-deliverable-upload-desktop-dark.png`, `/tmp/teklora-deliverable-review-mobile-dark.png`, `/tmp/teklora-deliverable-review-mobile-light.png`, `/tmp/teklora-deliverable-review-desktop-light.png`. Automated lifecycle/ACL tests cover additional mixed-assignee, deletion, account/permission revocation and stale-version cases; these are not claimed as separate manual production browser checks.
+
+### Remaining release/follow-up work
+- Production migration/application/static deployment and dedicated-account smoke testing require release authorization. Do not reverse/drop submission tables containing real evidence.
+- Explicit manager association of shared-team code commits is deferred; strict code evidence currently requires direct assignee attribution. No implicit completion of the other assignees is allowed.
+- Optional permission-checked backlinks from library detail are deferred; task reviewers already have exact-version links in Tasks.
+- No new standalone evidence-sharing revocation switch is added; unassignment, role/account revocation and normal library deletion/purge enforce the current access lifecycle.

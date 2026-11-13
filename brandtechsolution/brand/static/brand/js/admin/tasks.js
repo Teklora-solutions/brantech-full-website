@@ -403,7 +403,7 @@ function taskActivityRow(entry) {
     </div>`;
 }
 
-function taskDetailBody(task, activity) {
+function taskDetailBody(task, activity, submissions = []) {
     const mine = task.my_assignment;
     const inReview = task.status === 'in_review';
     const isDone = task.status === 'done';
@@ -427,7 +427,7 @@ function taskDetailBody(task, activity) {
                         </div>
                     </div>
                 </div>
-                ${TASK_CAN_MANAGE && !isDone ? `
+                ${TASK_CAN_MANAGE && !isDone && (a.done || task.delivery_requirement !== 'document') ? `
                     <button type="button" class="text-xs text-brand-blue hover:text-blue-400 transition-colors shrink-0"
                         data-action="${a.done ? 'admin-undone' : 'admin-done'}"
                         data-id="${escapeHtml(task.id)}" data-user="${escapeHtml(a.id)}">
@@ -452,6 +452,7 @@ function taskDetailBody(task, activity) {
 
         ${taskProgressBar(task)}
         ${taskCommitDetails(task)}
+        ${taskDeliverablesBody(task, submissions)}
 
         <div>
             <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Assigned to</h4>
@@ -459,7 +460,7 @@ function taskDetailBody(task, activity) {
         </div>
 
         <div class="flex flex-wrap gap-2 pt-2 border-t border-white/5">
-            ${mine && !isDone ? `
+            ${mine && !isDone && (mine.done || task.delivery_requirement !== 'document') ? `
                 <button type="button" data-action="${mine.done ? 'uncomplete' : 'complete'}"
                     data-id="${escapeHtml(task.id)}"
                     class="${mine.done
@@ -508,11 +509,12 @@ function taskDetailBody(task, activity) {
 
 async function openTaskDetail(id) {
     try {
-        const [task, activity] = await Promise.all([
+        const [task, activity, submissions] = await Promise.all([
             taskApi(`/tasks/${id}/`),
             taskApi(`/tasks/${id}/activity/`),
+            taskApi(`/tasks/${id}/deliverables/`),
         ]);
-        openTaskModal(task.title, taskDetailBody(task, activity));
+        openTaskModal(task.title, taskDetailBody(task, activity, submissions));
     } catch (e) { toastApiError(e, 'The task could not be opened.'); }
 }
 
@@ -568,6 +570,13 @@ function taskFormBody(task) {
             </div>
         </div>
         <div>
+            <label for="taskFormDelivery" class="${label}">Delivery requirement</label>
+            <select id="taskFormDelivery" class="${field}">
+                ${[['standard', 'Standard (existing completion)'], ['document', 'Document required'], ['code', 'Attributed code commit required'], ['either', 'Document or attributed code']].map(([value, text]) => `<option value="${value}" ${(task ? task.delivery_requirement : 'standard') === value ? 'selected' : ''}>${text}</option>`).join('')}
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Existing tasks keep their current workflow. Requirements cannot change after submission or completion.</p>
+        </div>
+        <div>
             <label class="${label}">Assign to</label>
             <div class="max-h-52 overflow-y-auto bg-[#06090F] border border-dark-border rounded-lg p-2 space-y-0.5">
                 ${people}
@@ -596,6 +605,7 @@ async function saveTask(id) {
         title: document.getElementById('taskFormTitle').value,
         description: document.getElementById('taskFormDescription').value,
         priority: Number(document.getElementById('taskFormPriority').value),
+        delivery_requirement: document.getElementById('taskFormDelivery').value,
         // An empty date input reads as ''. DRF rejects that for a DateField;
         // null is how "no due date" is spelled.
         due_date: due || null,
@@ -712,6 +722,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const button = event.target.closest('[data-action]');
         if (!button) return;
         const { action, id, user } = button.dataset;
+        if (action.startsWith('deliverable-')) { await taskDeliverableAction(button); return; }
 
         if (action === 'cancel-task') { closeTaskModal(); return; }
         if (action === 'save-task') { await saveTask(id); return; }

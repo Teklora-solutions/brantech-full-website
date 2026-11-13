@@ -11,6 +11,8 @@ from rest_framework.response import Response
 from staff.permissions import has_capability
 
 from .activity import record
+from .deliverable_api import TaskDeliverablesMixin
+from .deliverables import validate_completion, reset_reviews
 from .emails import notify_review_ready
 from .models import Repository, Task, TaskActivity, TaskAssignment, TaskCommit
 from .permissions import IsStaffMember
@@ -29,7 +31,7 @@ def _can_manage(user):
     return user.has_perm(f"staff.{CAPABILITY}")
 
 
-class TaskViewSet(viewsets.ModelViewSet):
+class TaskViewSet(TaskDeliverablesMixin, viewsets.ModelViewSet):
     serializer_class = TaskSerializer
     pagination_class = TaskPagination
 
@@ -121,6 +123,8 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         with transaction.atomic():
+            # Serialize assignment edits with submission/completion transactions.
+            serializer.instance = Task.objects.select_for_update().get(pk=serializer.instance.pk)
             # `before` may safely come off the prefetch cache - nothing has
             # changed yet. `after` may not, for the reason spelled out in
             # Task.refresh_review_state: the cache still holds the old list.
@@ -213,6 +217,10 @@ class TaskViewSet(viewsets.ModelViewSet):
             if assignment is None:
                 raise ValidationError("That person is not assigned to this task.")
 
+            if done:
+                validate_completion(assignment)
+            else:
+                reset_reviews(task, request.user, 'Assignment reopened; submit a fresh revision.', assignment)
             already = assignment.completed_at is not None
             if already != done:
                 assignment.completed_at = timezone.now() if done else None
@@ -244,6 +252,14 @@ class TaskViewSet(viewsets.ModelViewSet):
                 raise ValidationError(
                     "Only a task that is waiting for review can be approved."
                 )
+            from knowledge_base.models import LibraryDocument
+            list(LibraryDocument.objects.select_for_update().filter(
+                versions__task_attachments__submission__assignment__task=task).order_by('pk'))
+            assignments = list(task.assignments.select_related('user'))
+            if not assignments or any(a.completed_at is None for a in assignments):
+                raise ValidationError('Every current assignee must finish before approval.')
+            for assignment in assignments:
+                validate_completion(assignment, approval=True)
             task.status = Task.DONE
             task.closed_at = timezone.now()
             task.save(update_fields=["status", "closed_at", "updated_at"])
@@ -270,6 +286,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             # Every completion is cleared, not just the submission flag: the
             # task is going back to the whole group, and leaving people ticked
             # off would send it straight back into review on the next save.
+            reset_reviews(task, request.user, reason)
             task.assignments.update(completed_at=None)
             task.status = Task.OPEN
             task.submitted_at = None

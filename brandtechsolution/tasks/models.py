@@ -87,6 +87,11 @@ class Task(models.Model):
         choices=PRIORITY_CHOICES, default=NORMAL
     )
     due_date = models.DateField(null=True, blank=True)
+    delivery_requirement = models.CharField(
+        max_length=12, default='standard',
+        choices=[('standard', 'Standard (legacy completion)'), ('document', 'Document'),
+                 ('code', 'Code'), ('either', 'Document or code')],
+    )
 
     MANUAL = "manual"
     ROADMAP = "roadmap"
@@ -315,3 +320,43 @@ class TaskCommit(models.Model):
 
     def __str__(self):
         return f"{self.sha[:7]} on {self.task_id}"
+
+
+class TaskSubmission(models.Model):
+    """Immutable evidence round; unassignment and library purge retain history."""
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='submissions')
+    assignment = models.ForeignKey(TaskAssignment, null=True, on_delete=models.SET_NULL, related_name='submissions')
+    submitter = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='task_submissions')
+    revision = models.PositiveIntegerField()
+    note = models.TextField(blank=True, max_length=5000)
+    request_id = models.UUIDField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-id']
+        constraints = [models.UniqueConstraint(fields=['assignment', 'revision'], name='unique_assignment_submission_revision')]
+
+    @property
+    def review_state(self):
+        review = self.reviews.order_by('-id').first()
+        return review.decision if review else 'submitted'
+
+
+class TaskSubmissionAttachment(models.Model):
+    submission = models.ForeignKey(TaskSubmission, on_delete=models.CASCADE, related_name='attachments')
+    version = models.ForeignKey('knowledge_base.LibraryVersion', null=True, on_delete=models.SET_NULL, related_name='task_attachments')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['submission', 'version'], name='unique_submission_version')]
+
+
+class TaskSubmissionReview(models.Model):
+    """Append-only feedback; never overwrite an earlier acceptance/revision request."""
+    submission = models.ForeignKey(TaskSubmission, on_delete=models.CASCADE, related_name='reviews')
+    reviewer = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='task_submission_reviews')
+    decision = models.CharField(max_length=20, choices=[('accepted', 'Accepted'), ('changes_requested', 'Changes requested')])
+    feedback = models.TextField(blank=True, max_length=5000)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['id']

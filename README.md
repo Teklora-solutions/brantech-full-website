@@ -166,6 +166,21 @@ The MCP HTTP client uses bounded TCP address fallback (3 seconds per address, 10
 
 ---
 
+## 📎 Submit documents from Tasks
+
+Open **Teklora Admin → Tasks → a task assigned to you → Deliverables**:
+
+1. **Upload privately and attach** a PDF, DOCX, TXT, Markdown, PNG or JPEG (maximum 25 MB per file), confirming upload authority; or **Choose from library** to select a document you own or otherwise have administrator sharing authority over.
+2. Select up to 10 documents, add a submission note, and confirm sharing the selected versions with active task managers for private review.
+3. Choose **Submit work and mark my part complete**. Uploading alone does not finish work. If submission fails, the uploaded document stays in your library for retry.
+4. Managers download the exact submitted originals and **Accept submission** or **Request changes** with feedback. Revisions create new submission rounds. Once all assignees finish and their document submissions are accepted, a manager separately approves the task to **Done**.
+
+Submission history, notes and files are visible only to active task managers and the original still-assigned submitter—not other board readers or replacement assignees. Replacing a library document does not alter a submitted version. Deletion/purge makes evidence unavailable and blocks pending task approval. Task acceptance never grants external-processing clearance, publication approval or AI retrieval access.
+
+Managers can choose **Standard**, **Document**, **Code**, or **Document or code** when creating/editing a task before submissions/completions exist. Existing tasks remain Standard; they are not automatically converted or reopened. Code evidence for stricter tasks must be an assignee-attributed linked default-branch commit; shared-team manager associations are not part of this release. API-key/MCP and GitHub/roadmap completion paths enforce the same requirements.
+
+**Release:** apply migration `tasks.0006_task_delivery_requirement_tasksubmission_and_more` with `python manage.py migrate` and ship the updated application/static assets together. No production migration or deployment is performed by the implementation itself. Do not reverse/drop submission tables containing real evidence/history as a rollback strategy.
+
 ## 🛠️ Project Setup Guide
 
 ### Prerequisites
