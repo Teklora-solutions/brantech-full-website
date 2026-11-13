@@ -104,9 +104,22 @@ def finish_task(task, actor, reason):
     now = timezone.now()
     names = []
     for assignment in outstanding:
+        if task.delivery_requirement != 'standard':
+            # Automation must not finish other people's shares of new strict tasks.
+            if not actor or assignment.user_id != actor.pk:
+                continue
+        from .deliverables import validate_completion
+        from rest_framework.exceptions import ValidationError
+        try:
+            validate_completion(assignment)
+        except ValidationError:
+            # Evidence is not ready: leave the assignment open, not a false completion.
+            continue
         assignment.completed_at = now
         assignment.save(update_fields=["completed_at"])
         names.append(assignment.user.username)
+    if not names:
+        return False
     record(task, actor, "marked_done", f"{', '.join(names)} marked done: {reason}")
     if task.refresh_review_state() == Task.IN_REVIEW:
         record(task, None, "submitted", "Every assignee is finished")

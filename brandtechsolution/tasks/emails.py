@@ -43,3 +43,21 @@ def notify_review_ready(task, request=None):
     except Exception:
         logger.exception("Could not send review notification for task %s", task.pk)
         return 0
+
+
+def notify_deliverable_event(task, actor, event, submitter=None):
+    """Private content stays in the permission-checked panel, never in email."""
+    recipients = capability_holder_emails('manage_tasks') if event == 'submitted' else (
+        [submitter.email] if submitter and submitter.is_active and submitter.is_staff and submitter.email else [])
+    if not recipients:
+        return 0
+    try:
+        send_mail_each(
+            subject=f'[Teklora] Task #{task.pk}: deliverable {event.replace("_", " ")}',
+            message=f'A task deliverable was {event.replace("_", " ")}. Sign in to Tasks to view the private submission and feedback.\n/admin-panel/?section=tasks',
+            from_email=settings.DEFAULT_FROM_EMAIL, recipient_list=recipients, fail_silently=False,
+        )
+        return len(recipients)
+    except Exception:
+        logger.exception('Could not send deliverable notification for task %s', task.pk)
+        return 0

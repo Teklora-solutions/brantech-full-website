@@ -160,9 +160,26 @@ Teklora integrates native support for human software engineers and autonomous AI
 - **Developer API Keys & Agent Setup (`/admin-panel/?section=developer`)**: Staff members can view the one-click auto-setup link, copy reference agent configurations for Claude Code, Cursor, Windsurf, and Antigravity, and review instructions on obtaining API keys (`tkl_live_...`). Keys are managed securely via Django Admin with SHA-256 hashes.
 - **One-Click Agent Auto-Setup Link (`/developer/setup/`)**: Developers can copy an auto-setup URL or prompt to paste into their favourite agent (Claude Code, Cursor, Google Antigravity, Windsurf, Cline). The endpoint renders instructions on: (1) downloading the Teklora Developer Skill, (2) configuring the MCP Server, (3) receiving platform updates, and (4) guiding the user on setting their API key.
 - **Zero-Dependency Teklora Developer MCP Server (`brandtechsolution/scripts/teklora_mcp.py`)**: A standard JSON-RPC 2.0 stdio Model Context Protocol server exposing task management (`teklora_list_my_tasks`, `teklora_get_task_details`, `teklora_complete_task_assignment`), developer profiles (`teklora_get_developer_profile`), repository listings, and semantic knowledge search.
+The MCP HTTP client uses bounded TCP address fallback (3 seconds per address, 10 seconds total for TCP connection attempts), so unreachable IPv6 can fall back to IPv4 without consuming an agent's full tool deadline. HTTP I/O retains a 30-second timeout and standard TLS certificate verification. DNS resolution is outside the TCP budget. If you installed a standalone copy (for example `~/.teklora/teklora_mcp.py`), update it from `brandtechsolution/scripts/teklora_mcp.py` and reconnect/restart the MCP server; changing the repository alone does not update installed copies.
+
 - **Canonical Developer Skill (`skills/teklora-developer/SKILL.md`)**: Defines git branch standards (`<type>/<task-id>-<slug>`), Conventional Commits with task references (`feat(staff): [Task #41] ...`), the "Every Update" file maintenance contract, and the platform task ladder.
 
 ---
+
+## 📎 Submit documents from Tasks
+
+Open **Teklora Admin → Tasks → a task assigned to you → Deliverables**:
+
+1. **Upload privately and attach** a PDF, DOCX, TXT, Markdown, PNG or JPEG (maximum 25 MB per file), confirming upload authority; or **Choose from library** to select a document you own or otherwise have administrator sharing authority over.
+2. Select up to 10 documents, add a submission note, and confirm sharing the selected versions with active task managers for private review.
+3. Choose **Submit work and mark my part complete**. Uploading alone does not finish work. If submission fails, the uploaded document stays in your library for retry.
+4. Managers download the exact submitted originals and **Accept submission** or **Request changes** with feedback. Revisions create new submission rounds. Once all assignees finish and their document submissions are accepted, a manager separately approves the task to **Done**.
+
+Submission history, notes and files are visible only to active task managers and the original still-assigned submitter—not other board readers or replacement assignees. Replacing a library document does not alter a submitted version. Deletion/purge makes evidence unavailable and blocks pending task approval. Task acceptance never grants external-processing clearance, publication approval or AI retrieval access.
+
+Managers can choose **Standard**, **Document**, **Code**, or **Document or code** when creating/editing a task before submissions/completions exist. Existing tasks remain Standard; they are not automatically converted or reopened. Code evidence for stricter tasks must be an assignee-attributed linked default-branch commit; shared-team manager associations are not part of this release. API-key/MCP and GitHub/roadmap completion paths enforce the same requirements.
+
+**Release:** apply migration `tasks.0006_task_delivery_requirement_tasksubmission_and_more` with `python manage.py migrate` and ship the updated application/static assets together. No production migration or deployment is performed by the implementation itself. Do not reverse/drop submission tables containing real evidence/history as a rollback strategy.
 
 ## 🛠️ Project Setup Guide
 

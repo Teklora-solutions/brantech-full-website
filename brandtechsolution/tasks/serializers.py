@@ -124,7 +124,7 @@ class TaskSerializer(serializers.ModelSerializer):
         model = Task
         fields = [
             "id", "title", "description", "status", "status_display",
-            "priority", "priority_display", "due_date", "is_overdue",
+            "priority", "priority_display", "due_date", "is_overdue", "delivery_requirement",
             "assignees", "assignee_ids", "created_by_name", "my_assignment",
             "comment_count", "created_at", "updated_at", "submitted_at",
             "closed_at", "source", "source_display", "repository_name",
@@ -203,6 +203,9 @@ class TaskSerializer(serializers.ModelSerializer):
         return task
 
     def update(self, instance, validated_data):
+        if validated_data.get('delivery_requirement', instance.delivery_requirement) != instance.delivery_requirement:
+            if instance.status == Task.DONE or instance.submissions.exists() or instance.assignments.filter(completed_at__isnull=False).exists():
+                raise serializers.ValidationError({'delivery_requirement': 'Delivery requirements cannot change after submission or completion.'})
         users = validated_data.pop("assignee_ids", None)
         for field, value in validated_data.items():
             setattr(instance, field, value)
