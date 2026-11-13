@@ -1,0 +1,45 @@
+{% extends 'knowledge_base/base.html' %}
+{% block extra_head %}{{ block.super }}{% if migration.status == 'building' %}<meta http-equiv="refresh" content="30">{% endif %}{% endblock %}
+{% block library_header %}
+<header class="kb-header"><div class="kb-header-copy"><h1>Embedding management</h1><p>Automatic recovery and model migrations, with private document permissions kept intact.</p></div><a class="kb-btn" href="{% url 'library:embeddings' %}">Refresh status</a></header>
+{% endblock %}
+{% block library_content %}
+<div class="kb-stack kb-embedding-controls">
+<div class="kb-note"><h3>Automatic, not uncontrolled</h3><p>Workers retry transient failures with backoff, retain each successful vector, and resume interrupted work. Permanent credential/model errors need attention. Your originals and browser previews remain available. No provider/model fallback is performed.</p><p>Vertex AI and the Developer API have separate billing/quota. Production credits are on Vertex. Listed routing is not a verified credit balance.</p></div>
+<section class="kb-panel"><div class="kb-panel-header"><h2>Serving profile</h2><span class="kb-badge">{% if active %}Active{% else %}Not configured{% endif %}</span></div><div class="kb-panel-body">
+{% if active %}<h3>{{ active.model_id }}</h3><p>{{ active.get_api_backend_display }}{% if active.api_backend == 'configured' %} ({{ active.resolved_backend }}){% endif %} · {{ active.dimensions }} dimensions · {{ active.get_input_protocol_display }}</p><p>{{ active_remaining }} source{{ active_remaining|pluralize }} missing or stale; automatic repair runs in the background.</p>
+{% if active.last_error_code %}<p role="status">Last safe error: <strong>{{ active.last_error_code }}</strong>{% if active.needs_attention %} · fix configuration/permissions, then retry.{% endif %}{% if active.retry_after %} · provider cooldown until {{ active.retry_after|date:'M j, H:i:s' }}{% endif %}</p>{% endif %}
+<form method="post" action="{% url 'library:embedding-control' %}">{% csrf_token %}<input type="hidden" name="operation" value="retry_failed"><input type="hidden" name="space_id" value="{{ active.pk }}"><button class="kb-btn kb-btn-small" type="submit">Retry failed work / clear provider pause</button></form>
+{% else %}<p>No active embedding profile. Documents can still be read; select a target below to build a searchable index.</p>{% endif %}
+</div></section>
+{% if migration %}
+<section class="kb-panel"><div class="kb-panel-header"><h2>Current migration #{{ migration.pk }}</h2><span class="kb-badge">{{ migration.status|title }}</span></div><div class="kb-panel-body">
+<h3>{{ migration.target.model_id }}</h3><p>{{ migration.target.get_api_backend_display }}{% if migration.target.api_backend == 'configured' %} ({{ migration.target.resolved_backend }}){% endif %} · {{ migration.target.dimensions }} dimensions · automatic activation: {{ migration.auto_activate|yesno:'enabled,disabled' }}</p>
+<p>{{ completed }} / {{ total_sources }} eligible sources covered; {{ remaining }} remaining. New or changed documents are reconciled before cutover.</p><div class="kb-progress"><progress max="100" value="{{ progress_percent }}" aria-label="Migration coverage">{{ progress_percent }}%</progress></div>
+{% if migration.error_code %}<p role="alert">Validation needs attention: {{ migration.error_code }}</p>{% endif %}
+{% if migration.target.last_error_code %}<p role="status">Worker error: {{ migration.target.last_error_code }}{% if migration.target.retry_after %} · next provider attempt after {{ migration.target.retry_after|date:'M j, H:i:s' }}{% endif %}</p>{% endif %}
+<p class="kb-help">Completion requires all eligible generic and private library sources, valid query vectors and an index where supported. The old profile remains active until validated cutover. At 3072 dimensions, this pgvector setup uses a scan, not HNSW.</p>
+<form method="post" action="{% url 'library:embedding-control' %}">{% csrf_token %}<input type="hidden" name="migration_id" value="{{ migration.pk }}"><div class="kb-actions">
+{% if migration.status == 'paused' %}<button class="kb-btn" name="operation" value="resume">Resume</button>{% else %}<button class="kb-btn" name="operation" value="pause">Pause</button>{% endif %}
+<button class="kb-btn" name="operation" value="retry">Retry failures / validate configuration again</button>
+{% if not migration.auto_activate %}<button class="kb-btn kb-btn-primary" name="operation" value="activate">Activate when validated</button>{% endif %}
+<button class="kb-btn kb-btn-danger" name="operation" value="cancel">Cancel migration</button></div></form>
+<p class="kb-help">Building status refreshes every 30 seconds. Pausing stops new calls; completed work is retained.</p>
+</div></section>
+{% else %}
+<section class="kb-panel"><div class="kb-panel-header"><h2>Change model or billing route</h2></div><div class="kb-panel-body"><p>Choose a new profile. Workers build it without replacing the serving index. Existing vectors are retained for validated rollback.</p><form method="post">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}{% include 'knowledge_base/_field.html' %}{% endfor %}<button class="kb-btn kb-btn-primary" type="submit">Start background migration</button></form></div></section>
+{% endif %}
+<section class="kb-panel"><div class="kb-panel-header"><h2>Failures and scheduled retries</h2></div><div class="kb-panel-body">
+{% if legacy_unmanaged %}<p class="kb-help">{{ legacy_unmanaged }} historical document{{ legacy_unmanaged|pluralize }} use unversioned vectors and are not silently re-sent to Google. Search labels their lexical fallback. Re-index only authorized published articles; import private historical files through normal library clearance.</p>{% endif %}
+{% for version in version_failures %}<p><a href="{% url 'library:detail' version.document_id %}">Document #{{ version.document_id }} v{{ version.version_number }}: {{ version.document.title }}</a> · {{ version.safe_error_code }}{% if version.safe_error_code == 'LIBRARY_SOURCE_INVALID' %} · Retry processing to repair the local source cache.{% endif %}</p>{% endfor %}
+<div class="kb-tags">{% for row in work_counts %}<span class="kb-tag">{{ row.status|title }}: {{ row.count }}</span>{% empty %}<p>No durable work recorded yet.</p>{% endfor %}</div>
+<p class="kb-help">{{ extraction_failures }} current document{{ extraction_failures|pluralize }} failed before extraction completed. Review those documents separately; model migration does not repair corrupt or encrypted files.</p>
+{% for work in failures %}<div class="kb-grant"><div><strong>Source #{{ work.document_id }} · {{ work.document.scope }} · profile #{{ work.space_id }}</strong><p>{{ work.status|title }} · {{ work.error_code }} · attempt {{ work.attempts }}/6</p><p class="kb-help">{% if work.status == 'retry' %}Next scheduled attempt: {{ work.next_attempt_at|date:'M j, H:i:s' }} (subject to provider cooldown){% else %}Administrator retry required after fixing the cause.{% endif %}</p></div></div>{% empty %}<p>No failed work for the active/candidate profiles.</p>{% endfor %}
+{% if failures.has_previous or failures.has_next %}<nav class="kb-pagination" aria-label="Failures pages">{% if failures.has_previous %}<a href="?page={{ failures.previous_page_number }}">Previous</a>{% endif %}<span>Page {{ failures.number }} of {{ failures.paginator.num_pages }}</span>{% if failures.has_next %}<a href="?page={{ failures.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}
+</div></section>
+<section class="kb-panel"><div class="kb-panel-header"><h2>Retained profiles / rollback</h2></div><div class="kb-panel-body"><p class="kb-help">Rollback is validated against current source hashes and credentials, not an unsafe flip to stale vectors. It may need background repair and uses the displayed billing route.</p>
+{% for space in retired %}<div class="kb-grant"><div><strong>{{ space.model_id }}</strong><p>{{ space.get_api_backend_display }}{% if space.api_backend == 'configured' %} ({{ space.resolved_backend }}){% endif %} · {{ space.dimensions }} dimensions · profile #{{ space.pk }}</p></div>{% if not migration %}<form method="post" action="{% url 'library:embedding-control' %}">{% csrf_token %}<input type="hidden" name="operation" value="rollback"><input type="hidden" name="space_id" value="{{ space.pk }}"><button class="kb-btn kb-btn-small" aria-label="Request validated rollback to profile #{{ space.pk }}">Request validated rollback</button></form>{% endif %}</div>{% empty %}<p>No retained profiles yet.</p>{% endfor %}
+</div></section>
+{% if history %}<section class="kb-panel"><div class="kb-panel-header"><h2>Recent migrations</h2></div><div class="kb-panel-body">{% for item in history %}<p>#{{ item.pk }} · {{ item.target.model_id }} · {{ item.status|title }} · {{ item.updated_at|date:'M j, H:i' }}</p>{% endfor %}</div></section>{% endif %}
+</div>
+{% endblock %}

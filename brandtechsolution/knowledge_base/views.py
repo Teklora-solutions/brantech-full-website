@@ -1,12 +1,15 @@
 """CSRF-protected staff document library. No anonymous originals or public listing."""
 from functools import wraps
+from pathlib import Path
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods
 
@@ -16,6 +19,7 @@ from .library.access import visible_documents
 from .library.contracts import LibraryAction
 from .library.policy import LibraryPolicy
 from .library.services import audit, authorize, mutate, upload_document
+from .library.previews import PREVIEW_MIME, TEXT_LIMIT, PreviewUnavailable, docx_pdf
 
 
 STATUS_OPTIONS = [
@@ -106,6 +110,7 @@ def detail(request, pk):
     allowed = lambda action: bool(LibraryPolicy.evaluate(request.user, document, action))
     return render(request, 'knowledge_base/detail.html', {
         'document': document, 'version': document.current_version,
+        'preview_supported': bool(document.current_version and document.current_version.detected_format in PREVIEW_MIME),
         'can_edit': allowed(LibraryAction.EDIT), 'can_share': allowed(LibraryAction.SHARE),
         **_library_context(request.user, 'documents'),
         'metadata_form': forms.MetadataForm(instance=document, auto_id='metadata_%s'),
@@ -134,6 +139,62 @@ def download(request, pk):
     audit(document, request.user, 'download', version)
     response = FileResponse(original, as_attachment=True, filename=version.original_filename, content_type='application/octet-stream')
     response['Content-Security-Policy'] = "default-src 'none'; sandbox"
+    return response
+
+
+@library_view
+@require_GET
+def preview(request, pk, version_id):
+    document = get_object_or_404(visible_documents(request.user).select_related('current_version'), pk=pk)
+    authorize(request.user, document, LibraryAction.DOWNLOAD)
+    version = document.current_version
+    if not version or version.pk != version_id or version.detected_format not in PREVIEW_MIME:
+        raise Http404
+    if not version.original or not version.original.storage.exists(version.original.name):
+        raise Http404
+    fmt = version.detected_format
+    try:
+        if fmt in {'txt', 'md'}:
+            with version.original.open('rb') as original:
+                data = original.read(TEXT_LIMIT + 1)
+            response = render(request, 'knowledge_base/reader.html', {
+                'text': data[:TEXT_LIMIT].decode('utf-8-sig', errors='replace'),
+                'truncated': len(data) > TEXT_LIMIT,
+                'download_url': reverse('library:download', args=[document.pk]),
+            })
+            response['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; sandbox allow-downloads"
+        else:
+            if fmt == 'docx':
+                converted = docx_pdf(version)
+                # A conversion can take seconds: recheck revocation/replacement
+                # before delivering its result, without holding a DB lock over I/O.
+                actor = get_object_or_404(get_user_model(), pk=request.user.pk)
+                if not actor.is_active or not actor.is_staff:
+                    raise PermissionDenied
+                fresh = get_object_or_404(visible_documents(actor), pk=pk, current_version_id=version_id)
+                authorize(actor, fresh, LibraryAction.DOWNLOAD)
+                original = converted.open('rb')
+                filename = Path(version.original_filename).stem + '.pdf'
+            else:
+                original = version.original.open('rb')
+                filename = version.original_filename
+            response = FileResponse(original, as_attachment=False, filename=filename, content_type=PREVIEW_MIME[fmt])
+            # Strict MIME + nosniff: never serve raw Office/HTML/SVG as active
+            # application HTML. Avoid sandbox here: it disables native PDF plugins.
+            response['Content-Security-Policy'] = "default-src 'none'; frame-ancestors 'self'"
+    except FileNotFoundError:
+        raise Http404 from None
+    except PreviewUnavailable as exc:
+        response = render(request, 'knowledge_base/reader.html', {
+            'error': str(exc), 'download_url': reverse('library:download', args=[document.pk]),
+        }, status=503)
+        response['Retry-After'] = '5'
+        response['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; sandbox allow-downloads"
+    else:
+        audit(document, request.user, 'preview', version, format=fmt)
+    response['X-Frame-Options'] = 'SAMEORIGIN'
+    response['Referrer-Policy'] = 'no-referrer'
+    response['Cross-Origin-Resource-Policy'] = 'same-origin'
     return response
 
 

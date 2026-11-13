@@ -76,8 +76,9 @@ class RememberTests(MemoryTestCase):
     def test_provenance_survives_the_space_being_corrected(self):
         """Denormalised on purpose: what produced a vector cannot change later."""
         self.memory.remember("text", title="T")
-        self.space.model_id = "renamed-after-the-fact"
-        self.space.save()
+        # Ordinary saves now forbid identity edits. Simulate an external SQL
+        # correction to retain coverage of denormalised historical provenance.
+        EmbeddingSpace.objects.filter(pk=self.space.pk).update(model_id="renamed-after-the-fact")
 
         self.assertEqual(Embedding.objects.get().model_id, "models/gemini-embedding-001")
 

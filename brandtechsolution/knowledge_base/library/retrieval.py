@@ -159,24 +159,40 @@ class LibraryRetrievalEngine:
         from langsmith import tracing_context
         if not query.strip():
             return []
-        if actor is not None and getattr(actor, 'is_authenticated', False) and not actor.is_active:
+        authenticated = actor is not None and getattr(actor, 'is_authenticated', False)
+        def refreshed_actor():
+            if not authenticated:
+                return actor
+            from django.contrib.auth import get_user_model
+            users = get_user_model().objects.filter(pk=actor.pk, is_active=True)
+            if audience != Audience.PUBLIC:
+                users = users.filter(is_staff=True)
+            return users.first()
+        current_actor = refreshed_actor()
+        if authenticated and current_actor is None:
             return []
-        rows = eligible_chunks(actor, public=audience == Audience.PUBLIC)
+        rows = eligible_chunks(current_actor, public=audience == Audience.PUBLIC)
         if not rows.exists():
             return []
         space = EmbeddingSpace.active()
         if not space:
             from ai_workflows.harness.errors import MemoryUnavailable
             raise MemoryUnavailable('Library semantic search has no active embedding space.')
-        if embedder is None:
-            from brandtechsolution.config import config
-            if space.provider != 'gemini' or space.model_id.removeprefix('models/') != config.gemini_embedding_model.removeprefix('models/'):
-                from ai_workflows.harness.errors import MemoryUnavailable
-                raise MemoryUnavailable('Library embedding provider/model does not match the active space.')
+        if space.provider != 'gemini':
+            from ai_workflows.harness.errors import MemoryUnavailable
+            raise MemoryUnavailable('Library embedding provider is not cleared.')
         # Query text is user-supplied; no document text is sent to the embedder.
         with tracing_context(enabled=False):
             vector = Memory(embedder=embedder)._embed(query, space)
-        rows = rows.filter(memory_document__embeddings__space=space).annotate(
+        # Credential refresh/query generation may be slow: rebuild permissions
+        # from a fresh user after it, including removed administrator roles.
+        current_actor = refreshed_actor()
+        if authenticated and current_actor is None:
+            return []
+        rows = eligible_chunks(current_actor, public=audience == Audience.PUBLIC)
+        from knowledge_base.embedding_lifecycle import current_vectors, verified_library_chunks
+        rows = rows.filter(pk__in=verified_library_chunks().values('pk'), memory_document__embeddings__space=space,
+                           memory_document__embeddings__pk__in=current_vectors(space).values('pk')).annotate(
             distance=CosineDistance('memory_document__embeddings__vector', vector),
         ).order_by('distance')[:max(0, min(int(limit), 20))]
         results = []
@@ -189,7 +205,7 @@ class LibraryRetrievalEngine:
                 citation=f'[Doc #{document.pk} v{version.version_number}: {document.title}, {chunk.page_or_section}]',
                 visibility=document.visibility, is_public=version.public_approval_state == 'approved',
             ))
-        self._audit_admin_results(actor, results)
+        self._audit_admin_results(current_actor, results)
         return results
 
     @staticmethod

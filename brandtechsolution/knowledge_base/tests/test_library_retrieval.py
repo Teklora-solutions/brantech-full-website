@@ -124,6 +124,14 @@ class MemoryIsolationTests(TestCase):
             self.space.status = EmbeddingSpace.ACTIVE
             self.space.save()
 
+    def protected_record(self, text, title):
+        # Seed historical private records directly: generic remember is now
+        # forbidden from dispatching uncleared protected content to a provider.
+        record = MemoryDocument.objects.create(scope='library', text=text, title=title)
+        Embedding.objects.create(document=record, space=self.space, provider=self.space.provider,
+                                 model_id=self.space.model_id, dimensions=self.space.dimensions,
+                                 vector=self.embedder.embed_query(text))
+
     def test_generic_unscoped_recall_excludes_protected_library_records(self):
         """Memory.recall(scope=None) must NOT leak protected library documents."""
         # 1. Normal editorial document
@@ -134,8 +142,7 @@ class MemoryIsolationTests(TestCase):
         )
 
         # 2. Protected library document chunk
-        lib_memory = Memory(embedder=self.embedder, scope="library")
-        lib_memory.remember(
+        self.protected_record(
             "Confidential board minutes regarding proprietary M&A strategy.",
             title="Confidential Board Minutes",
         )
@@ -151,7 +158,7 @@ class MemoryIsolationTests(TestCase):
     def test_explicit_scope_cannot_bypass_library_authorization(self):
         """A scope name is not an authorization context; use the ACL retrieval service."""
         lib_memory = Memory(embedder=self.embedder, scope="library")
-        lib_memory.remember(
+        self.protected_record(
             "Private research paper on quantum computing benchmarks.",
             title="Quantum Research Paper",
         )

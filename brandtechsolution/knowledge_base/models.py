@@ -73,10 +73,16 @@ class EmbeddingSpace(models.Model):
     provider = models.CharField(max_length=40, default='gemini')
     model_id = models.CharField(max_length=120)
     dimensions = models.PositiveIntegerField()
+    api_backend = models.CharField(max_length=20, default='configured', choices=[('configured', 'Configured Google route'), ('vertex', 'Vertex AI'), ('developer_api', 'Gemini Developer API')])
+    input_protocol = models.CharField(max_length=20, default='legacy', choices=[('legacy', 'Legacy query inputs'), ('retrieval_v1', 'Document/query retrieval v1')])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=BUILDING)
 
     created_at = models.DateTimeField(auto_now_add=True)
     activated_at = models.DateTimeField(null=True, blank=True)
+    retry_after = models.DateTimeField(null=True, blank=True)
+    needs_attention = models.BooleanField(default=False)
+    consecutive_failures = models.PositiveSmallIntegerField(default=0)
+    last_error_code = models.CharField(max_length=40, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -90,6 +96,23 @@ class EmbeddingSpace(models.Model):
 
     def __str__(self):
         return f"{self.provider}/{self.model_id} ({self.dimensions}d, {self.status})"
+
+    def save(self, *args, **kwargs):
+        identity = {'provider', 'model_id', 'dimensions', 'api_backend', 'input_protocol'}
+        fields = identity.intersection(kwargs.get('update_fields') or identity)
+        if not self._state.adding and fields:
+            previous = type(self).objects.using(self._state.db).filter(pk=self.pk).values(*fields).first()
+            if previous and any(previous[field] != getattr(self, field) for field in fields):
+                from django.core.exceptions import ValidationError
+                raise ValidationError('Embedding profile identity is immutable; create a separate migration target.')
+        return super().save(*args, **kwargs)
+
+    @property
+    def resolved_backend(self):
+        if self.api_backend == 'configured':
+            from brandtechsolution.config import config
+            return config.embedding_backend
+        return self.api_backend
 
     @classmethod
     def active(cls):
@@ -153,7 +176,7 @@ class Embedding(models.Model):
     """One document's vector in one space.
 
     provider / model_id / dimensions are denormalised from the space on
-    purpose. A space row can be edited and a model can be renamed or retired,
+    purpose. Historical space rows could be edited and models can be renamed or retired,
     but what produced *this* vector cannot change after the fact, so provenance
     has to survive its parent being corrected. It also makes "which model
     served this result?" a query rather than an inference from deployment
@@ -185,6 +208,7 @@ class Embedding(models.Model):
     # exists -- a narrower space is a supported Matryoshka truncation of the
     # same model, and it is indexable.
     vector = VectorField()
+    content_hash = models.CharField(max_length=64, blank=True, default='')
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -197,8 +221,50 @@ class Embedding(models.Model):
         ]
         indexes = [models.Index(fields=['space', 'document'])]
 
+    def save(self, *args, **kwargs):
+        if not self.content_hash and self.document_id:
+            self.content_hash = self.document.content_hash
+        return super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.document} in {self.space}"
+
+
+class EmbeddingWork(models.Model):
+    """Durable, leased per-source work; no credentials or provider exception bodies."""
+    space = models.ForeignKey(EmbeddingSpace, on_delete=models.CASCADE, related_name='work_items')
+    document = models.ForeignKey(MemoryDocument, on_delete=models.CASCADE, related_name='embedding_work')
+    source_hash = models.CharField(max_length=64, blank=True)
+    status = models.CharField(max_length=16, default='queued', db_index=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(default=timezone.now, db_index=True)
+    lease_token = models.UUIDField(default=uuid.uuid4)
+    clearance_token = models.UUIDField(null=True, blank=True)
+    dispatched_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    error_code = models.CharField(max_length=40, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['space', 'document'], name='unique_embedding_work_source')]
+        indexes = [models.Index(fields=['status', 'next_attempt_at'], name='embedding_work_due')]
+
+
+class EmbeddingMigration(models.Model):
+    """One explicitly requested migration; old spaces remain available for rollback."""
+    target = models.ForeignKey(EmbeddingSpace, on_delete=models.PROTECT, related_name='migrations')
+    previous = models.ForeignKey(EmbeddingSpace, null=True, on_delete=models.SET_NULL, related_name='outgoing_migrations')
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='embedding_migrations')
+    status = models.CharField(max_length=20, default='building', db_index=True)
+    # A NULL slot releases the global single-migration guard, retaining history.
+    active_slot = models.PositiveSmallIntegerField(default=1, null=True, unique=True)
+    auto_activate = models.BooleanField(default=False)
+    preflight_passed = models.BooleanField(default=False)
+    validation_attempts = models.PositiveSmallIntegerField(default=0)
+    next_validation_at = models.DateTimeField(default=timezone.now)
+    error_code = models.CharField(max_length=40, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class LibraryDocument(models.Model):
@@ -231,6 +297,7 @@ class LibraryVersion(models.Model):
     uploader = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='library_uploads')
     upload_authority = models.BooleanField(default=False)
     processing_state = models.CharField(max_length=30, default='awaiting_clearance', db_index=True)
+    extraction_complete = models.BooleanField(default=False)
     clearance_state = models.CharField(max_length=20, default='pending', db_index=True)
     public_approval_state = models.CharField(max_length=20, default='not_reviewed', db_index=True)
     classification = models.CharField(max_length=40, default='internal_standard')

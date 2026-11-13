@@ -124,6 +124,35 @@ Implementation plan: [Task document deliverables](plans/2026-11-12-task-document
 
 ---
 
+### 📖 Milestone 8: Private browser document readers *(Implemented locally; release pending)*
+
+Plan: [Library previews](plans/2026-11-13-library-browser-previews-plan.md). Contract: [Private rendering](specs/2026-11-13-library-browser-previews-spec.md).
+
+- [x] Add current-version, ACL-protected PDF/image/text previews without requiring external-processing clearance.
+- [x] Convert DOCX to PDF through an isolated self-hosted LibreOffice sidecar; cache privately and purge derivatives with originals.
+- [x] Keep original downloads, explicit error/fallback controls and separate extracted text. Use a full-tab PDF reader on narrow screens.
+- [x] Verify access/revocation, escaping, conversion bounds/cache/purge, actual DOCX headings/tables and desktop/mobile browser flow.
+- [ ] Deploy updated web/maintenance workers, static assets and document-preview sidecar; no preview-specific DB migration.
+
+---
+
+### 🔁 Milestone 9: Automatic embedding recovery & managed model migration *(Implemented and verified locally; release pending)*
+
+Contract: [Embedding lifecycle](specs/2026-11-13-embedding-lifecycle-spec.md). Execution: [Implementation and verification](plans/2026-11-13-embedding-lifecycle-plan.md).
+
+- [x] Add immutable model/dimension/protocol/backend profiles, source-hash checkpoints, durable work leases and migration records.
+- [x] Implement explicit Vertex/Developer API Google adapters, model-specific input formatting and space-bound query clients without fallback.
+- [x] Checkpoint extraction and vectors independently; resume failed/interrupted work with bounded backoff, provider pauses and small broker dispatch windows.
+- [x] Add private administrator progress/failure controls, cost consent, preflight, background builds, pause/resume/retry/cancel and full-coverage/query/index-gated activation/rollback.
+- [x] Preserve clearance/ACL/current-version checks, reject stale results and protect generic memory from library-backed/mistagged records; harden legacy CLI activation.
+- [x] Verify initial offline client/lifecycle/concurrency/migration round-trip tests against isolated PostgreSQL/pgvector.
+- [x] Complete final affected-app regression run and local admin browser verification: 1,032 core tests passed; all-affected-app run has one independently reproduced baseline editorial email expectation failure. Real index/cutover/rollback browser flow uses offline providers.
+- [ ] Obtain deployment sign-off and address unrelated baseline repository test failures separately.
+- [ ] Independently complete live Vertex 001-vs-2 evaluation; previous timed-out probe produced no measurements.
+- [ ] Deploy schema/code/static assets/all workers/Beat, then explicitly request any production target. No production switch or paid corpus job performed here.
+
+---
+
 ## ✅ Completed Milestones
 
 - [x] **Statutory Compliance & Legal Engine**: KDPA 2019 & GDPR compliant Privacy Policy and Terms of Service.

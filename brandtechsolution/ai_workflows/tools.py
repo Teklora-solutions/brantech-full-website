@@ -2,7 +2,6 @@
 RAG tools for retrieving blog posts and projects using pgvector and Django ORM.
 """
 from langchain.tools import tool
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from django.contrib.auth.models import User
 from brandtechsolution.config import config
 import logging
@@ -32,21 +31,12 @@ def _handle_search_error(error: Exception, search_type: str) -> str:
         return f"I encountered an issue searching {search_type}. Please try again or ask about something else."
 
 
-# Singleton embedding instance
-_embeddings = None
-
-
 def get_embeddings():
-    """Get or create embeddings instance using Google Gemini API."""
-    global _embeddings
-    if _embeddings is None:
-        # models/embedding-001 produces 768-dimensional vectors (matches our VectorField)
-        _embeddings = GoogleGenerativeAIEmbeddings(
-            model=config.gemini_embedding_model,
-            google_api_key=config.google_api_key
-        )
-        logger.info("Embedding model initialized successfully")
-    return _embeddings
+    """Resolve the active profile and its explicit Google billing route."""
+    from ai_workflows.harness.llm import get_embedder
+    from knowledge_base.models import EmbeddingSpace
+    # Do not cache a model-independent singleton across model cutovers.
+    return get_embedder(space=EmbeddingSpace.active())
 
 
 class _SiteSearch:

@@ -16,8 +16,24 @@
 {% if version.safe_error_code %}<div class="kb-alert error" role="alert"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><div><strong>Processing needs attention</strong><p>{{ version.safe_error_code }}. Contact an administrator or retry after the issue is resolved.</p>{% if can_edit and version.processing_state == 'failed' %}<form method="post" action="{% url 'library:action' document.pk 'retry' %}">{% include 'knowledge_base/_version_token.html' %}<button class="kb-btn kb-btn-small" type="submit">Retry processing</button></form>{% endif %}</div></div>{% endif %}
 <div class="kb-layout">
     <div class="kb-stack">
+        {% if preview_supported %}
+        <section class="kb-panel" aria-label="Original document preview">
+            <div class="kb-panel-header"><div><h2>Read document</h2><p>{% if version.detected_format == 'docx' %}Word document converted privately to PDF{% else %}Original document{% endif %} · version {{ version.version_number }}</p></div><span class="kb-badge">{{ version.detected_format|upper }}</span></div>
+            <div class="kb-original-preview">
+                {% if version.detected_format == 'png' or version.detected_format == 'jpg' or version.detected_format == 'jpeg' %}
+                <img class="kb-preview-image" src="{% url 'library:preview' document.pk version.pk %}" alt="{{ document.title }} — document image" loading="lazy" referrerpolicy="no-referrer">
+                {% else %}
+                <iframe class="kb-preview-frame{% if version.detected_format == 'pdf' or version.detected_format == 'docx' %} kb-pdf-reader{% endif %}" src="{% url 'library:preview' document.pk version.pk %}{% if version.detected_format == 'pdf' or version.detected_format == 'docx' %}#view=FitH&amp;navpanes=0{% endif %}" title="{{ document.title }} — document reader" loading="lazy" referrerpolicy="no-referrer"></iframe>
+                {% endif %}
+                {% if version.detected_format == 'pdf' or version.detected_format == 'docx' %}
+                <div class="kb-native-reader-mobile kb-panel-body"><h3>Read the PDF in your browser</h3><p class="kb-help">For a clearer view on a small screen, open the PDF reader in its own tab.</p><div class="kb-actions"><a class="kb-btn kb-btn-primary" href="{% url 'library:preview' document.pk version.pk %}" target="_blank" rel="noopener noreferrer">Read PDF<i class="fas fa-up-right-from-square" aria-hidden="true"></i></a></div></div>
+                {% endif %}
+            </div>
+            <div class="kb-panel-body"><p class="kb-help">{% if version.detected_format == 'docx' %}The first preview may take a few seconds. Word layout can vary with fonts. {% endif %}If the viewer is unavailable on your browser, open it separately or download the original. A replacement requires refreshing this page.</p><div class="kb-actions"><a class="kb-btn kb-btn-small" href="{% url 'library:preview' document.pk version.pk %}" target="_blank" rel="noopener noreferrer"><i class="fas fa-up-right-from-square" aria-hidden="true"></i>Open preview</a><a class="kb-btn kb-btn-small" href="{% url 'library:download' document.pk %}"><i class="fas fa-download" aria-hidden="true"></i>Download original</a></div><p class="kb-help">Private preview only — no AI processing or public-use approval is granted.</p></div>
+        </section>
+        {% endif %}
         <section class="kb-panel" aria-label="Extracted document preview">
-            <div class="kb-panel-header"><div><h2>Document preview</h2><p>Extracted text · version {{ version.version_number }}</p></div><span class="kb-badge">{{ version.detected_format|upper }}</span></div>
+            <div class="kb-panel-header"><div><h2>Searchable extracted text</h2><p>Extracted text · version {{ version.version_number }}</p></div><span class="kb-badge">{{ version.detected_format|upper }}</span></div>
             {% for chunk in chunks %}<details class="kb-preview-chunk" {% if forloop.first %}open{% endif %}><summary>{{ chunk.page_or_section }} · section {{ chunk.ordinal|add:1 }}</summary><pre>{{ chunk.text }}</pre></details>{% empty %}<div class="kb-preview-empty"><i class="fas {% if version.processing_state == 'awaiting_clearance' %}fa-shield-halved{% elif version.processing_state == 'failed' %}fa-circle-exclamation{% else %}fa-file-lines{% endif %}" aria-hidden="true"></i><h3>{% if version.processing_state == 'awaiting_clearance' %}Waiting for processing clearance{% elif version.processing_state == 'queued' or version.processing_state == 'processing' %}Your document is being prepared{% elif version.processing_state == 'blocked' %}Processing is blocked{% else %}No extracted preview yet{% endif %}</h3><p>{% if version.processing_state == 'awaiting_clearance' %}An administrator needs to review this upload before text extraction and embedding can begin.{% elif version.processing_state == 'queued' or version.processing_state == 'processing' %}Refresh this page shortly to check for extracted text.{% else %}Check the processing status above. You can still download the original if you have access.{% endif %}</p></div>{% endfor %}
         </section>
         {% if can_edit %}

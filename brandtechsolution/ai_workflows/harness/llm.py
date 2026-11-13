@@ -414,7 +414,7 @@ def _configured_model(provider, *, agent=None):
     return model
 
 
-def get_embedder(*, provider=None, agent=None):
+def get_embedder(*, provider=None, agent=None, space=None):
     """The embedding model.
 
     Resolved separately from `get_model`, and deliberately not multi-provider.
@@ -425,7 +425,7 @@ def get_embedder(*, provider=None, agent=None):
     embeddings stay on one, and losing the embedding provider degrades memory
     whatever else is configured.
     """
-    provider = Provider(provider) if provider else Provider.GEMINI
+    provider = Provider(provider or (space.provider if space is not None else 'gemini'))
 
     if provider is not Provider.GEMINI:
         raise ModelUnavailable(
@@ -433,22 +433,13 @@ def get_embedder(*, provider=None, agent=None):
             provider=provider.value, agent=agent,
         )
 
-    from langchain_google_genai import GoogleGenerativeAIEmbeddings
+    from .embeddings import GoogleEmbeddingClient
 
-    if not config.google_api_key:
-        raise ModelUnavailable(
-            "GOOGLE_API_KEY is not set", provider=provider.value, agent=agent
-        )
-
-    try:
-        return GoogleGenerativeAIEmbeddings(
-            model=config.gemini_embedding_model,
-            google_api_key=config.google_api_key,
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise ModelUnavailable(
-            f"could not build the embedding client: {exc}",
-            provider=provider.value,
-            model=config.gemini_embedding_model,
-            agent=agent,
-        ) from exc
+    # The stored profile, not the currently configured default model, defines
+    # both candidate document vectors and serving queries during a migration.
+    return GoogleEmbeddingClient(
+        model=space.model_id if space is not None else config.gemini_embedding_model,
+        backend=space.resolved_backend if space is not None else config.embedding_backend,
+        protocol=space.input_protocol if space is not None else 'legacy',
+        dimensions=space.dimensions if space is not None else 3072,
+    )

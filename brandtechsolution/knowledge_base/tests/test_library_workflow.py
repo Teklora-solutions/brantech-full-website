@@ -11,7 +11,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, Client, override_settings
 from django.utils import timezone
 
-from knowledge_base.models import LibraryDocument, LibraryGrant, LibraryVersion, LibraryChunk, LibraryAudit, EmbeddingSpace, MemoryDocument
+from knowledge_base.models import LibraryDocument, LibraryGrant, LibraryVersion, LibraryChunk, LibraryAudit, EmbeddingSpace, MemoryDocument, Embedding
 from knowledge_base.library.access import visible_documents
 from knowledge_base.library.contracts import Audience
 from knowledge_base.library.policy import LibraryPolicy
@@ -182,8 +182,11 @@ class LibraryWorkflowTests(TestCase):
         embedder = Mock()
         embedder.embed_query.side_effect = delete_during_call
         process_version(self.version.pk, embedder=embedder)
-        self.assertFalse(self.version.chunks.exists())
-        self.assertFalse(MemoryDocument.objects.filter(scope='library').exists())
+        # Local extraction is checkpointed, but no provider result is published.
+        # Scheduled deletion maintenance removes these retained private sources.
+        self.assertTrue(self.version.chunks.exists())
+        self.assertFalse(Embedding.objects.filter(document__library_chunk__version=self.version).exists())
+        self.assertEqual(LibraryRetrievalEngine().retrieve('architecture', self.owner), [])
 
     def test_replacement_during_extraction_never_calls_provider(self):
         self.change('clear', self.admin, {'classification': 'internal_standard', 'reason': 'Reviewed'})
@@ -209,7 +212,8 @@ class LibraryWorkflowTests(TestCase):
         embedder.embed_query.return_value = [1, 0]
         with self.assertRaises(ValueError):
             process_version(self.version.pk, embedder=embedder)
-        self.assertFalse(self.version.chunks.exists())
+        self.assertTrue(self.version.chunks.exists())
+        self.assertFalse(Embedding.objects.filter(document__library_chunk__version=self.version).exists())
 
     def test_delete_blocks_download_then_purges_original_text_and_vectors(self):
         self.publish()
@@ -354,7 +358,8 @@ class LibraryWorkflowTests(TestCase):
             return [1, 0, 0]
         embedder.embed_query.side_effect = reclear
         process_version(self.version.pk, embedder=embedder)
-        self.assertFalse(self.version.chunks.exists())
+        self.assertTrue(self.version.chunks.exists())
+        self.assertFalse(Embedding.objects.filter(document__library_chunk__version=self.version).exists())
         self.version.refresh_from_db()
         self.assertEqual(self.version.processing_state, 'queued')
 

@@ -122,7 +122,8 @@ def index_article_embeddings_task(self, article_id: int, blog_post_id: int):
     so a slow embedding delayed the editor's response and a failing one was
     swallowed with a warning and never retried.
 
-    Safe to retry, unlike the pipeline: index_document upserts on title.
+    Safe to retry, unlike the pipeline: index_document upserts on article ID,
+    and vector work retains durable per-source recovery state.
     """
     from editorial.models import EditorialArticle
     from knowledge_base.services.knowledge_graph import KnowledgeBaseAgent

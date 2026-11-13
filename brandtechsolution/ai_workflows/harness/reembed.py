@@ -81,19 +81,21 @@ class Report:
 
 
 def target_space(provider, model_id, dimensions):
-    """Find or create the space being built. Never returns the active one.
+    """Find or create the latest matching CLI profile.
 
-    A space is identified by all three of provider, model and width: the same
-    model at two widths produces vectors that cannot be compared, so they are
-    two spaces and not one.
+    Model, width, billing backend and input protocol identify compatible work.
+    Reusing a matching active profile repairs its missing/stale vectors rather
+    than silently changing the serving model.
     """
     from knowledge_base.models import EmbeddingSpace
+    from brandtechsolution.config import config
 
-    space, created = EmbeddingSpace.objects.get_or_create(
-        provider=provider, model_id=model_id, dimensions=dimensions,
-        defaults={"status": EmbeddingSpace.BUILDING},
-    )
-    return space, created
+    profile = dict(provider=provider, model_id=model_id, dimensions=dimensions,
+                   api_backend=config.embedding_backend, input_protocol='retrieval_v1')
+    space = EmbeddingSpace.objects.filter(**profile).order_by('-created_at', '-pk').first()
+    if space is not None:
+        return space, False
+    return EmbeddingSpace.objects.create(**profile, status=EmbeddingSpace.BUILDING), True
 
 
 def pending(space, *, scope=None, kind=None):
@@ -103,12 +105,11 @@ def pending(space, *, scope=None, kind=None):
     it simply finds less to do. A run killed halfway through is resumed by
     starting it again.
     """
-    from knowledge_base.models import MemoryDocument
-
     from knowledge_base.library.retrieval import PROTECTED_LIBRARY_SCOPES
     # Library content requires its own current-version/clearance worker path.
     # Generic backfills have no actor, classification or provider-clearance context.
-    rows = MemoryDocument.objects.exclude(embeddings__space=space).exclude(scope__in=PROTECTED_LIBRARY_SCOPES)
+    from knowledge_base.embedding_lifecycle import pending as eligible_pending
+    rows = eligible_pending(space).exclude(scope__in=PROTECTED_LIBRARY_SCOPES)
     if scope:
         rows = rows.filter(scope=scope)
     if kind:
@@ -223,8 +224,10 @@ def execute(plan, *, memory=None, batch_size=DEFAULT_BATCH_SIZE, on_batch=None):
     from ai_workflows.harness.memory import Memory
     from knowledge_base.models import Embedding
 
-    memory = memory or Memory()
+    from ai_workflows.harness.llm import get_embedder
+    from ai_workflows.harness.embeddings import validate_vector, classify_failure
     space = plan.space
+    memory = memory or Memory(embedder=get_embedder(space=space))
     report = Report(space=space)
 
     documents = [document for document, _ in plan.documents]
@@ -240,31 +243,38 @@ def execute(plan, *, memory=None, batch_size=DEFAULT_BATCH_SIZE, on_batch=None):
             vectors = memory.embed_many(
                 [_text_for(document) for document in batch], space,
             )
+            if len(vectors) != len(batch):
+                raise ValueError('Embedding count mismatch')
+            vectors = [validate_vector(vector, space.dimensions) for vector in vectors]
         except Exception as exc:  # noqa: BLE001 - one batch, not the run
             report.failed += len(batch)
-            report.errors.append(str(exc))
+            code = classify_failure(exc).code
+            report.errors.append(code)
             logger.warning(
                 "[reembed] batch %d of space %s failed: %s",
-                report.batches, space.pk, exc,
+                report.batches, space.pk, code,
             )
             if on_batch:
                 on_batch(report)
             continue
 
-        Embedding.objects.bulk_create(
-            [
-                Embedding(
-                    space=space, document=document, provider=space.provider,
-                    model_id=space.model_id, dimensions=space.dimensions,
-                    vector=vector,
-                )
-                for document, vector in zip(batch, vectors)
-            ],
-            # A document already embedded here by a concurrent run is not an
-            # error; the unique constraint is doing its job.
-            ignore_conflicts=True,
-        )
-        report.embedded += len(batch)
+        from knowledge_base.embedding_lifecycle import source_fence, current_vectors
+        from knowledge_base.models import MemoryDocument
+        with source_fence():
+            for document, vector in zip(batch, vectors):
+                source = MemoryDocument.objects.filter(pk=document.pk, content_hash=document.content_hash).exclude(scope__in=PROTECTED_LIBRARY_SCOPES).first()
+                if source is None:
+                    report.failed += 1
+                    report.errors.append('SOURCE_CHANGED')
+                    continue
+                # A document already embedded here by a concurrent run is not
+                # an error; preserve its successful checkpoint.
+                if not current_vectors(space).filter(document=source).exists():
+                    Embedding.objects.update_or_create(space=space, document=source, defaults={
+                        'provider': space.provider, 'model_id': space.model_id, 'dimensions': space.dimensions,
+                        'vector': vector, 'content_hash': source.content_hash,
+                    })
+                report.embedded += 1
 
         if on_batch:
             on_batch(report)
@@ -284,33 +294,38 @@ def _text_for(document):
     return f"{title}\n\n{text}".strip() if title else text
 
 
-def activate(space, *, require_complete=True):
+def activate(space, *, require_complete=True, embedder=None):
     """Make `space` the one queries use, in a single atomic flip.
 
     The old space is retired rather than deleted -- it stays queryable, and a
-    cutover that turns out to have been wrong is reversed by flipping back
-    rather than by re-embedding the corpus a second time.
+    validated rollback can reuse current-hash vectors rather than rebuilding
+    the whole corpus a second time.
 
-    Refuses a space that is not fully built unless told otherwise, because
+    The require_complete argument is retained for compatibility, but no longer
+    permits incomplete activation. Refuses an unfinished space, because
     activating a half-filled space does not fail: it silently returns worse
     results, for the documents that happen to be missing, with nothing to
     indicate why.
     """
-    from django.db import transaction
     from django.utils import timezone
 
     from knowledge_base.models import EmbeddingSpace
 
-    if require_complete:
-        missing = pending(space).count()
-        if missing:
-            raise ValueError(
-                f"{missing} document(s) still have no vector in this space. "
-                f"Activating it would silently return worse results for those "
-                f"documents. Finish the backfill, or pass force to accept it."
-            )
+    missing = pending(space).count()
+    if missing:
+        raise ValueError(
+            f'{missing} document(s) still have no vector in this space. '
+            'Finish the backfill; force no longer bypasses completeness.'
+        )
 
-    with transaction.atomic():
+    from knowledge_base.embedding_lifecycle import source_fence, coverage_guard, probe_profile
+    probe_profile(space, embedder=embedder)
+    with source_fence():
+        # Even legacy --force may not silently abandon eligible source vectors.
+        coverage_guard(space)
+        from knowledge_base.models import EmbeddingMigration
+        if EmbeddingMigration.objects.filter(active_slot=1).exists():
+            raise ValueError('A managed migration is in progress; use its administrator controls.')
         # Retire first: a partial unique index allows exactly one active space,
         # so the two statements cannot be reordered.
         EmbeddingSpace.objects.filter(

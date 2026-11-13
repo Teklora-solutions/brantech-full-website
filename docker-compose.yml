@@ -44,6 +44,11 @@ services:
     environment:
       DATABASE_HOST: db
       REDIS_HOST: redis
+      EMBEDDING_BACKEND: vertex
+      LIBRARY_PREVIEW_CONVERTER_URL: http://document-preview:3000
+    networks:
+      - default
+      - preview-internal
     volumes:
       - ./data/media:/app/brandtechsolution/media
       # Mail attachments: private, never under media.
@@ -56,6 +61,37 @@ services:
       redis:
         condition: service_healthy
 
+  # Private DOCX -> PDF rendering. No host port, application files, credentials
+  # or Internet route. Only web can reach this internal conversion network.
+  document-preview:
+    image: gotenberg/gotenberg:9.5.0@sha256:ac61457a1e889ef1ca256a9afc117cff8caf517f19e66ea23cede3feb22f69a5
+    restart: unless-stopped
+    networks:
+      - preview-internal
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    cpus: 1
+    pids_limit: 128
+    command:
+      - gotenberg
+      - --api-timeout=40s
+      - --api-body-limit=30MB
+      - --libreoffice-max-queue-size=2
+      - --libreoffice-enable-macros=false
+      - --libreoffice-deny-list=.*
+      - --libreoffice-deny-private-ips=true
+      - --libreoffice-deny-public-ips=true
+      - --chromium-disable-routes=true
+      - --pdf-disable-routes=true
+      - --pdf-disable-stages=true
+      - --log-level=error
+
   # Replaces the old `outbox` service, which was a
   # `while true; do manage.py process_email_outbox; sleep 60; done` loop.
   # That work is now a Beat schedule; this container executes it, along with
@@ -67,6 +103,7 @@ services:
     environment:
       DATABASE_HOST: db
       REDIS_HOST: redis
+      EMBEDDING_BACKEND: vertex
     volumes:
       # Same media mount as web: the visual agent writes generated assets.
       - ./data/media:/app/brandtechsolution/media
@@ -94,9 +131,12 @@ services:
     environment:
       DATABASE_HOST: db
       REDIS_HOST: redis
+      EMBEDDING_BACKEND: vertex
       LANGSMITH_TRACING: "false"
     volumes:
       - ./data/private:/app/brandtechsolution/private
+      # Explicit Vertex embedding route uses this read-only service account.
+      - ./credentials:/app/brandtechsolution/credentials:ro
     command: ["library-worker"]
     mem_limit: 1g
     cpus: 2
@@ -130,3 +170,7 @@ services:
     env_file: ./cloudflared.env
     depends_on:
       - web
+
+networks:
+  preview-internal:
+    internal: true

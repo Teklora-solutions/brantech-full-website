@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Private document preview</title>
+<style>
+:root{color-scheme:light dark}body{margin:0;padding:1.25rem;font:1rem/1.6 system-ui,sans-serif;background:Canvas;color:CanvasText}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:0}aside{border:1px solid GrayText;border-radius:.5rem;padding:1rem;margin-bottom:1rem}a{color:LinkText}h1{font-size:1.15rem}p{margin:.5rem 0}
+</style></head>
+<body>
+{% if error %}<aside role="alert"><h1>Preview unavailable</h1><p>{{ error }}</p><p><a href="">Retry preview</a> · <a href="{{ download_url }}" download>Download original</a></p></aside>
+{% else %}{% if truncated %}<aside role="note">This preview shows the first 256 KiB. <a href="{{ download_url }}" download>Download the original</a> to read the complete document.</aside>{% endif %}<pre>{{ text }}</pre>{% endif %}
+</body></html>
