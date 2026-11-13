@@ -74,6 +74,8 @@ class Memory:
     def __init__(self, embedder=None, scope="default"):
         self._embedder = embedder
         self._embedder_resolved = embedder is not None
+        self._injected_embedder = embedder is not None
+        self._space_client_key = None
 
         # What this memory writes to, and what it reads from unless a caller
         # says otherwise. Two agents with different scopes do not see each
@@ -116,9 +118,15 @@ class Memory:
         Unchanged text is not re-embedded. The content hash makes a repeated
         save free rather than another paid call.
         """
-        from knowledge_base.models import Embedding, MemoryDocument
+        from knowledge_base.models import MemoryDocument
+        from knowledge_base.embedding_lifecycle import source_fence, ensure_work, perform_work, enqueue_work, current_vectors, generic_sources
 
-        space = self._active_space()
+        from knowledge_base.models import EmbeddingSpace
+        from knowledge_base.library.retrieval import PROTECTED_LIBRARY_SCOPES
+        protected_object = obj is not None and obj._meta.concrete_model._meta.label_lower in {
+            'knowledge_base.librarychunk', 'knowledge_base.libraryversion', 'knowledge_base.librarydocument'}
+        if not isinstance(self.scope, str) or self.scope in PROTECTED_LIBRARY_SCOPES or protected_object:
+            raise MemoryUnavailable('Protected library writes require the cleared library processing service.')
         digest = content_hash(text)
 
         lookup = {"content_type": None, "object_id": None}
@@ -128,7 +136,9 @@ class Memory:
                 "object_id": obj.pk,
             }
 
-        with transaction.atomic():
+        with source_fence():
+            # Cutover cannot race creation/update of a canonical source.
+            space = EmbeddingSpace.active()
             if obj is not None:
                 document, _ = MemoryDocument.objects.get_or_create(
                     **lookup,
@@ -142,7 +152,9 @@ class Memory:
                     metadata=metadata or {}, content_hash=digest,
                 )
 
-            already = Embedding.objects.filter(space=space, document=document).exists()
+            if not generic_sources().filter(pk=document.pk).exists():
+                raise MemoryUnavailable('Protected library sources cannot be changed through generic memory.')
+            already = space is not None and current_vectors(space).filter(document=document, content_hash=digest).exists()
             if already and document.content_hash == digest:
                 return MemoryRecord(document)
 
@@ -153,17 +165,12 @@ class Memory:
                 document.metadata = metadata
             document.save()
 
-        vector = self._embed(text, space)
-
-        Embedding.objects.update_or_create(
-            space=space, document=document,
-            defaults={
-                "provider": space.provider,
-                "model_id": space.model_id,
-                "dimensions": space.dimensions,
-                "vector": vector,
-            },
-        )
+        if space is None:
+            raise MemoryUnavailable('Source retained; select and build an embedding profile in Library administration.')
+        work = ensure_work(document, space)
+        if not perform_work(work.pk, embedder=self._embedder if self._injected_embedder else None):
+            transaction.on_commit(lambda: enqueue_work(work.pk))
+            raise MemoryUnavailable('Embedding is pending automatic recovery; source text is retained.')
         return MemoryRecord(document, model_id=space.model_id, provider=space.provider)
 
     def recall(self, query, *, kind=None, limit=5, record_usage=True,
@@ -189,13 +196,14 @@ class Memory:
         """
         from pgvector.django import CosineDistance
 
-        from knowledge_base.models import Embedding, MemoryDocument
+        from knowledge_base.models import MemoryDocument
+        from knowledge_base.embedding_lifecycle import current_vectors, generic_sources
 
         space = self._active_space()
         vector = self._embed(query, space)
 
         rows = (
-            Embedding.objects.filter(space=space)
+            current_vectors(space)
             .select_related("document")
             .annotate(distance=CosineDistance(self._vector_column(space), vector))
             .order_by("distance")
@@ -208,7 +216,7 @@ class Memory:
         # Generic memory has no authenticated ACL context. Explicit scope names
         # must not provide a bypass; library retrieval uses its own joined query.
         from knowledge_base.library.retrieval import PROTECTED_LIBRARY_SCOPES
-        rows = rows.exclude(document__scope__in=PROTECTED_LIBRARY_SCOPES)
+        rows = rows.exclude(document__scope__in=PROTECTED_LIBRARY_SCOPES).filter(document_id__in=generic_sources().values('pk'))
 
         if kind:
             rows = rows.filter(document__kind=kind)
@@ -285,7 +293,21 @@ class Memory:
             return vector
         return [value / length for value in vector]
 
-    def _embed(self, text, space=None):
+    def _client_for(self, space):
+        if self._injected_embedder or space is None:
+            return self.embedder
+        key = (space.pk, space.model_id, space.dimensions, space.resolved_backend, space.input_protocol)
+        if key != self._space_client_key:
+            from ai_workflows.harness.llm import get_embedder
+            previous = self._embedder
+            if self._space_client_key is not None and hasattr(previous, 'close'):
+                previous.close()
+            self._embedder = get_embedder(space=space)
+            self._embedder_resolved = True
+            self._space_client_key = key
+        return self._embedder
+
+    def _embed(self, text, space=None, *, document=False):
         """Embed `text` at the width the space expects.
 
         The width is not optional. A query embedded at 3072 dimensions cannot
@@ -294,29 +316,36 @@ class Memory:
         the ones that write.
         """
         try:
-            vector = self._embed_call(
-                self.embedder.embed_query, text or "", space,
-            )
+            client = self._client_for(space)
+            if document and getattr(space, 'input_protocol', 'legacy') != 'legacy' and hasattr(client, 'embed_documents'):
+                vectors = self._embed_call(client.embed_documents, [text or ''], space)
+                if len(vectors) != 1:
+                    raise MemoryUnavailable('Embedding response count mismatch.')
+                vector = vectors[0]
+            else:
+                vector = self._embed_call(client.embed_query, text or '', space)
         except MemoryUnavailable:
             raise
         except Exception as exc:  # noqa: BLE001
-            raise MemoryUnavailable(f"could not embed: {exc}") from exc
+            from .embeddings import classify_failure
+            raise MemoryUnavailable(f'Embedding unavailable: {classify_failure(exc).code}') from exc
 
         return self._normalise(vector)
 
     def embed_many(self, texts, space):
         """Embed a batch, for the re-embedding job.
 
-        One request for many documents rather than one each: the provider
-        charges the same for the tokens and the round trips dominate a backfill
-        of any size.
+        Adapters decide batching: Google routes use one request per input to
+        avoid model-2 aggregation and Vertex single-input restrictions. Durable
+        per-source jobs, rather than batches, are the preferred recovery path.
         """
         try:
             vectors = self._embed_call(
-                self.embedder.embed_documents, list(texts), space,
+                self._client_for(space).embed_documents, list(texts), space,
             )
         except Exception as exc:  # noqa: BLE001
-            raise MemoryUnavailable(f"could not embed a batch: {exc}") from exc
+            from .embeddings import classify_failure
+            raise MemoryUnavailable(f'Embedding batch unavailable: {classify_failure(exc).code}') from exc
 
         return [self._normalise(vector) for vector in vectors]
 
@@ -343,10 +372,13 @@ class Memory:
         """Drop what is remembered about `obj`."""
         from knowledge_base.models import MemoryDocument
 
-        return MemoryDocument.objects.filter(
-            content_type=ContentType.objects.get_for_model(obj.__class__),
-            object_id=obj.pk,
-        ).delete()[0]
+        from knowledge_base.embedding_lifecycle import source_fence, generic_sources
+        from knowledge_base.library.retrieval import PROTECTED_LIBRARY_SCOPES
+        with source_fence():
+            return MemoryDocument.objects.filter(
+                content_type=ContentType.objects.get_for_model(obj.__class__),
+                object_id=obj.pk,
+            ).exclude(scope__in=PROTECTED_LIBRARY_SCOPES).filter(pk__in=generic_sources().values('pk')).delete()[0]
 
     # ------------------------------------------------------------------
     # episodic

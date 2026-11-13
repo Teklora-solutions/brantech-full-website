@@ -1,4 +1,5 @@
 from django import forms
+from ai_workflows.harness.embeddings import GOOGLE_MODEL_CHOICES
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from .models import LibraryDocument
@@ -80,3 +81,17 @@ class ReviewForm(forms.Form):
 
 class GrantRemovalForm(forms.Form):
     grant_id = forms.IntegerField(min_value=1)
+
+
+class EmbeddingProfileForm(forms.Form):
+    model = forms.ChoiceField(choices=GOOGLE_MODEL_CHOICES)
+    backend = forms.ChoiceField(choices=[('vertex', 'Vertex AI — configured GCP project/credits'), ('developer_api', 'Gemini Developer API — separate quota/billing')], initial='vertex')
+    dimensions = forms.TypedChoiceField(choices=[(768, '768'), (1536, '1536 (recommended)'), (3072, '3072 (no HNSW index)')], coerce=int, initial=1536)
+    auto_activate = forms.BooleanField(required=False, initial=True, label='Activate automatically only after complete coverage and successful validation')
+    confirm_cost = forms.BooleanField(label='I authorize background re-indexing through this billing route; it may consume credits or incur charges.')
+
+
+class EmbeddingControlForm(forms.Form):
+    operation = forms.ChoiceField(choices=[(value, value) for value in ['pause', 'resume', 'retry', 'activate', 'cancel', 'retry_failed', 'rollback']])
+    migration_id = forms.IntegerField(required=False, min_value=1)
+    space_id = forms.IntegerField(required=False, min_value=1)

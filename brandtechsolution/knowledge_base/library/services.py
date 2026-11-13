@@ -148,5 +148,10 @@ def mutate(actor, document_id, expected_version_id, action, data=None, upload=No
         version.public_approval_state = {'approve': 'approved', 'reject': 'rejected', 'revoke': 'revoked'}[action]
         details = {'reason': data['reason']}
     version.save()
+    if action in {'clear', 'retry'} and version.clearance_state == 'approved':
+        from knowledge_base.models import EmbeddingWork
+        EmbeddingWork.objects.filter(document__library_chunk__version=version, space__status='active',
+            status__in=['blocked', 'exhausted', 'retry', 'cancelled']).update(
+            status='queued', attempts=0, error_code='', next_attempt_at=timezone.now(), dispatched_at=None)
     audit(document, actor, action, version, **details)
     return version

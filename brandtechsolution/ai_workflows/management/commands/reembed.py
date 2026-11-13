@@ -47,7 +47,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--force", action="store_true",
-            help="Allow activating a space that is not fully built.",
+            help="Deprecated compatibility flag; activation always requires complete eligible coverage.",
         )
         parser.add_argument(
             "--no-index", action="store_true",

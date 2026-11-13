@@ -6,6 +6,8 @@ langchain
 langgraph
 langchain-community
 langchain-google-genai
+# Explicit, space-bound Vertex/Developer embedding adapters (no model fallback).
+google-genai>=1.66,<3
 
 # Chat providers beyond Gemini. Two packages cover five: DeepSeek, OpenRouter
 # and Codex all document OpenAI-compatible endpoints, so ChatOpenAI serves them

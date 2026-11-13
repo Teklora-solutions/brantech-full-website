@@ -30,12 +30,15 @@ class IsSensitiveTests(TestCase):
 
 
 class MaskSecretTests(TestCase):
-    def test_long_value_is_masked(self):
+    def test_long_value_reports_presence_without_even_a_prefix_or_suffix(self):
         fake_value = "A" * 40
         masked = _mask_secret(fake_value)
-        self.assertNotIn(fake_value, masked)
-        self.assertTrue(masked.startswith(fake_value[:8]))
-        self.assertTrue(masked.endswith(fake_value[-4:]))
+        self.assertEqual(masked, '<configured>')
+        self.assertNotIn(fake_value[:8], masked)
+        self.assertNotIn(fake_value[-4:], masked)
 
-    def test_short_value_returns_stars(self):
-        self.assertEqual(_mask_secret("short"), "***")
+    def test_short_value_only_reports_presence(self):
+        self.assertEqual(_mask_secret('short'), '<configured>')
+
+    def test_empty_credential_is_not_reported_as_configured(self):
+        self.assertEqual(_mask_secret(''), '<empty>')

@@ -2,7 +2,7 @@
 {% load static %}
 {% block title %}Knowledge Library · Teklora{% endblock %}
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'knowledge_base/library.css' %}?v=2">
+<link rel="stylesheet" href="{% static 'knowledge_base/library.css' %}?v=3">
 {% endblock %}
 {% block content %}
 <div class="kb">
@@ -14,6 +14,7 @@
     <nav class="kb-tabs" aria-label="Library navigation">
         <a class="kb-tab" href="{% url 'library:index' %}" {% if library_section == 'documents' %}aria-current="page"{% endif %}><i class="fas fa-folder-open" aria-hidden="true"></i>Documents{% if overview %}<span class="kb-count">{{ overview.total }}</span>{% endif %}</a>
         {% if is_library_admin %}
+        <a class="kb-tab" href="{% url 'library:embeddings' %}" {% if library_section == 'embeddings' %}aria-current="page"{% endif %}><i class="fas fa-database" aria-hidden="true"></i>Embeddings</a>
         <a class="kb-tab" href="{% url 'library:review' %}" {% if library_section == 'clearance' %}aria-current="page"{% endif %}><i class="fas fa-shield-halved" aria-hidden="true"></i>Processing clearance{% if overview %}<span class="kb-count">{{ overview.awaiting }}</span>{% endif %}</a>
         <a class="kb-tab" href="{% url 'library:review' %}?queue=public" {% if library_section == 'public' %}aria-current="page"{% endif %}><i class="fas fa-globe" aria-hidden="true"></i>Public review{% if overview %}<span class="kb-count">{{ overview.public_pending }}</span>{% endif %}</a>
         {% endif %}

@@ -296,6 +296,7 @@ class EmbeddingTests(TestCase):
                 patch("ai_workflows.harness.llm.config") as cfg:
             cfg.google_api_key = "k"
             cfg.gemini_embedding_model = "models/gemini-embedding-001"
+            cfg.embedding_backend = 'developer_api'
             embedder = get_embedder()
 
         # The class is GoogleGenerativeAIEmbeddings; "google" is the marker.

@@ -49,9 +49,8 @@ _SENSITIVE_MARKERS = ("KEY", "SECRET", "TOKEN", "PASSWORD")
 
 
 def _mask_secret(value: str) -> str:
-    """Mask a sensitive value for safe logging."""
-    value = str(value)
-    return f"{value[:8]}...{value[-4:]}" if len(value) > 12 else "***"
+    """Report configuration presence, never credential prefixes/suffixes."""
+    return '<configured>' if value else '<empty>'
 
 
 def _is_sensitive(key: str) -> bool:
@@ -83,9 +82,9 @@ def _set_external_environment():
     for key, value in env_overrides.items():
         if value is not None:
             os.environ[key] = str(value)
-            # Log config for debugging, masking any sensitive value
+            # Log config for debugging, never even partial credential values.
             if _is_sensitive(key):
-                logger.debug(f"[LangSmith] {key}={_mask_secret(value)}")
+                logger.debug('[LangSmith] %s=%s', key, _mask_secret(value))
             else:
                 logger.debug(f"[LangSmith] {key}={value}")
 

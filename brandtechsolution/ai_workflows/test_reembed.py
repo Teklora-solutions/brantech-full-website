@@ -124,7 +124,7 @@ class PlanTests(TestCase):
         _document("todo")
         Embedding.objects.create(
             space=self.space, document=done, provider="gemini",
-            model_id="stub-embed", dimensions=NARROW, vector=[0.0] * NARROW,
+            model_id="stub-embed", dimensions=NARROW, vector=[1.0] + [0.0] * (NARROW - 1),
         )
         titles = [d.title for d, _ in reembed.plan(self.space).documents]
         self.assertEqual(titles, ["todo"])
@@ -271,7 +271,7 @@ class ActivationTests(TestCase):
         self.assertIn("still have no vector", str(caught.exception))
 
     def test_cutover_retires_the_old_space_rather_than_deleting_it(self):
-        reembed.activate(self.new)
+        reembed.activate(self.new, embedder=StubEmbedder())
         self.old.refresh_from_db()
         self.new.refresh_from_db()
         self.assertEqual(self.new.status, EmbeddingSpace.ACTIVE)
@@ -280,19 +280,19 @@ class ActivationTests(TestCase):
         self.assertTrue(EmbeddingSpace.objects.filter(pk=self.old.pk).exists())
 
     def test_only_one_space_is_ever_active(self):
-        reembed.activate(self.new)
+        reembed.activate(self.new, embedder=StubEmbedder())
         self.assertEqual(
             EmbeddingSpace.objects.filter(status=EmbeddingSpace.ACTIVE).count(), 1,
         )
 
-    def test_forcing_accepts_an_incomplete_space(self):
+    def test_force_no_longer_bypasses_complete_coverage(self):
         _document("orphan")
-        reembed.activate(self.new, require_complete=False)
-        self.new.refresh_from_db()
-        self.assertEqual(self.new.status, EmbeddingSpace.ACTIVE)
+        with self.assertRaises(ValueError):
+            reembed.activate(self.new, require_complete=False, embedder=StubEmbedder())
+        self.assertEqual(EmbeddingSpace.active().pk, self.old.pk)
 
     def test_activation_records_when_it_happened(self):
-        reembed.activate(self.new)
+        reembed.activate(self.new, embedder=StubEmbedder())
         self.new.refresh_from_db()
         self.assertIsNotNone(self.new.activated_at)
 

@@ -21,4 +21,4 @@ def semantic_search_api(request):
         'metadata': d.metadata
     } for d in docs]
 
-    return JsonResponse({'query': q, 'results': results})
+    return JsonResponse({'query': q, 'results': results, 'search_mode': agent.search_mode})

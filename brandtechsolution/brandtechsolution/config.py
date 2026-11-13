@@ -184,6 +184,7 @@ class AppSettings(BaseSettings):
     # Gemini Model Configuration
     gemini_chat_model: str = "gemini-2.5-flash"
     gemini_embedding_model: str = "models/gemini-embedding-001"
+    embedding_backend: str = "vertex"
     
     # ============================================================
     # LangSmith Configuration
@@ -219,6 +220,9 @@ class AppSettings(BaseSettings):
     google_application_credentials: str = ""
     vertex_project_id: str = ""
     vertex_location: str = "global"
+
+    # Self-hosted private DOCX -> PDF converter; never an external viewer.
+    library_preview_converter_url: str = ""
 
     # Per-request ceiling for a chat model call, in seconds.
     llm_timeout: int = 60

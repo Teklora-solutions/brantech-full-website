@@ -40,7 +40,13 @@ def setup_periodic_tasks(sender, **kwargs):
     from messaging.tasks import process_email_outbox_task
     from ai_workflows.tasks import refresh_catalogue_task
     from tasks.tasks import poll_repositories_task
-    from knowledge_base.tasks import maintain_library
+    from knowledge_base.tasks import maintain_library, maintain_embeddings
+
+    sender.add_periodic_task(
+        60.0, maintain_embeddings.s(),
+        name='resume embedding work and validate model migrations',
+        options={'expires': 60},
+    )
 
     sender.add_periodic_task(
         crontab(minute='*/15'), maintain_library.s(),
