@@ -34,7 +34,7 @@ This document serves as the high-level roadmap and strategic milestone tracker f
 ---
 
 ### 💻 Milestone 3: GitHub Manager & Developer Portal *(In Progress)*
-- [ ] **GitHub Admin Panel Integration** (`/admin-panel/?section=githubSync`):
+- [ ] **GitHub Admin Panel Integration** (Unified into `/admin-panel/?section=projects`):
   - [x] Live repository management dashboard with search, filtering, and project conversion.
   - [x] Background sync, commit counts tracking, and interactive README markdown inspector (`brand/github_service.py`).
   - [x] Persistent database snapshots for GitHub metadata, account details, README/commits and document audits, with background refresh, revision/hash reuse and rate-limit backoff (`docs/specs/2026-10-28-github-database-cache-spec.md`).
@@ -51,25 +51,27 @@ This document serves as the high-level roadmap and strategic milestone tracker f
     - [x] Zero-dependency Teklora Developer MCP Server (`brandtechsolution/scripts/teklora_mcp.py`) exposing task management, profile, repos, and knowledge base search.
     - [x] Bounded MCP TCP address fallback for broken IPv6 connectivity, preserving IPv4 fallback and TLS verification with transport regression coverage.
     - [x] Teklora Developer Skill (`skills/teklora-developer/SKILL.md`) codifying architecture standards, task ladder, git conventions, and file maintenance contract.
-  - [ ] Staff GitHub repository discovery: scan and import accessible repositories from configured staff GitHub profiles.
+  - [x] Staff GitHub repository discovery: scan and import accessible repositories from configured staff GitHub profiles (`brand/github_service.py`, `test_github.py`).
   - [ ] Automated PR status linking with Teklora Admin Tasks.
 - [ ] **Client Project Delivery Hub**:
   - [ ] Client-facing milestone tracking and deliverable inspection.
 
 ---
 
-### 💼 Milestone 4: Careers Page & Admin Management System *(Initiated / In Progress)*
-- [ ] **Job Openings Schema & Data Architecture** (`docs/specs/2026-10-11-careers-page-admin-management-spec.md`):
-  - [ ] `JobOpening` model with department, work mode, employment type, qualifications, and active flags.
-  - [ ] Django admin registration with search and status filters.
-- [ ] **Teklora Admin Careers Management Hub** (`/admin-panel/?section=careers`):
-  - [ ] Role listing with active/draft badges and instant publish/unpublish toggles.
-  - [ ] Modal creation and editing with structured duties & requirements fields.
-- [ ] **Dynamic Public Careers Experience** (`/careers/`):
-  - [ ] Live database querying replacing hardcoded static positions in `brand/careers.html`.
-  - [ ] Department filtering, expandable position details, and pre-filled email application trigger.
-  - [x] Empty state fallback with general resume submission prompt.
-- [x] **Closing roles, tracks and partners**: Close / Reopen for jobs and tracks, Hide / Show for partners, in the panel; closed roles leave `/careers/` and late applicants get an automatic applications-closed reply.
+### 💼 Milestone 4: Careers Page & Admin Management System *(Completed)*
+- [x] **Job Openings Schema & Data Architecture**:
+  - [x] Canonical `Career` database model with title, location, employment type, description, document attachments, and application email (`brand/models.py`).
+  - [x] Django admin registration (`CareerAdmin` in `brand/admin.py`) with search, status filters, and `ManageStaffAdminMixin` permissions.
+- [x] **Teklora Admin Careers Management Hub** (`/admin-panel/partnerships/?tab=jobs`):
+  - [x] Dedicated "Job openings" workspace in the themed Partnerships & People admin panel.
+  - [x] Role listing with Open/Closed badges, one-click Close / Reopen actions, and creation/editing modal (`CareerForm`).
+- [x] **Dynamic Public Careers Experience** (`/careers/`):
+  - [x] Live database querying in `brand/views.py` (`Career.objects.filter(status=Career.STATUS_OPEN)`) replacing static positions in `brand/careers.html`.
+  - [x] Position cards with role details, document download links, and pre-filled email application triggers with `JOB-<id>` reference subjects.
+  - [x] Empty state fallback with general resume submission prompt when no roles are open.
+- [x] **Closing roles, tracks and partners**:
+  - [x] Close / Reopen for jobs and tracks, Hide / Show for partners in the panel; closed roles leave `/careers/`.
+  - [x] Automated applications-closed reply engine (`messaging/autoreply.py`) with SPF validation, rate limiting, and role reference identification for late applicants.
 
 ---
 
