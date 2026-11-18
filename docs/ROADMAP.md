@@ -40,6 +40,7 @@ This document serves as the high-level roadmap and strategic milestone tracker f
   - [x] Persistent database snapshots for GitHub metadata, account details, README/commits and document audits, with background refresh, revision/hash reuse and rate-limit backoff (`docs/specs/2026-10-28-github-database-cache-spec.md`).
   - [x] Repository document standard: README, CHANGELOG, ROADMAP and LICENSE checked per repository, with an alert and a Documents tab (`docs/specs/2026-10-20-repo-docs-standard-spec.md`).
   - [x] Automatically turn missing or invalid required documents into assignable documentation repair tasks in Project backlog, with deduplication and review on resolution (`docs/specs/2026-10-28-documentation-repair-backlog-spec.md`).
+  - [x] Standardize canonical Teklora proprietary license across repositories and resolve repository audit backlog (`[Task #50]`).
   - [x] Show whether the GitHub key is a personal account or an organisation.
   - [x] Import roadmap leaf items automatically from GitHub-synced projects into a separate unassigned backlog with project filters and manager-led assignment (`docs/specs/2026-10-28-roadmap-backlog-spec.md`).
   - [x] Link task commits and submit closing commits or merged task branches for review through polling and an optional signed webhook; show project import status and task commit details in Admin Tasks (`docs/specs/2026-10-28-github-task-automation-spec.md`).
