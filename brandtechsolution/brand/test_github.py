@@ -231,15 +231,15 @@ class EndpointTests(GitHubTestCase):
     def test_the_admin_panel_links_the_github_manager(self):
         self.client.force_login(staff_with("manage_projects"))
         page = self.client.get("/admin-panel/").content.decode()
-        self.assertIn('id="nav-githubSync"', page)
-        self.assertIn('id="githubSync"', page)
+        self.assertIn('id="nav-projects"', page)
+        self.assertIn('id="projects"', page)
         self.assertIn("js/admin/github.js", page)
 
     def test_the_github_manager_is_hidden_without_manage_projects(self):
         self.client.force_login(staff_with("manage_blog"))
         page = self.client.get("/admin-panel/").content.decode()
-        self.assertNotIn('id="nav-githubSync"', page)
-        self.assertNotIn('id="githubSync"', page)
+        self.assertNotIn('id="nav-projects"', page)
+        self.assertNotIn('id="projects"', page)
 
     def test_the_list_includes_project_data_for_synced_repos(self):
         self.add(repo_id=101, name="widget", description="A widget.")
